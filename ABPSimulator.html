@@ -1,0 +1,922 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Simulador de ABP</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+/* VOICE: material de aula da PUC Minas — sóbrio, claro, feito para projetar e para o aluno mexer sozinho.
+   IDEA: o teste de mesa dos slides da Unidade VII ganhando vida: código, memória e árvore lado a lado.
+   PICTURE: a própria árvore, grande, com a seta i percorrendo os nós e o código acendendo linha a linha.
+   COLOUR and TYPE: azul-marinho e dourado do template das aulas; laranja só para o que está acontecendo agora.
+   LAYOUT: barra de operações, depois código à esquerda e árvore + memória à direita; abaixo, o player e a classe completa. */
+:root{color-scheme:light dark;
+ --bg:light-dark(#f6f7f9,#0e1522);--card:light-dark(#fff,#16202f);--ink:light-dark(#18202b,#e6ebf2);--mute:light-dark(#5b6573,#9aa6b6);
+ --navy:#0b2d5b;--navyink:light-dark(#0b2d5b,#a9c3e8);--gold:#c9a227;--line:light-dark(#d9dfe8,#2a3647);
+ --no:light-dark(#e8eef7,#1d2c44);--noborda:light-dark(#0b2d5b,#7fa3d6);
+ --lar:#d9822b;--larcl:light-dark(#fcebd9,#3a2a16);--verde:#2e7d4f;--verdecl:light-dark(#dff2e6,#173323);
+ --verm:#b3261e;--vermcl:light-dark(#fcedec,#3b1a18);--roxo:#6b3fa0;--roxocl:light-dark(#eee6f7,#2a1f3a);
+ --codebg:light-dark(#f3f5f8,#101826)}
+:root[data-theme=light]{color-scheme:light}:root[data-theme=dark]{color-scheme:dark}
+*{box-sizing:border-box;min-width:0}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 "Source Sans 3",system-ui,sans-serif;overflow-x:clip}
+header{background:var(--navy);color:#fff;border-bottom:4px solid var(--gold);padding:14px max(3vw,14px)}
+header h1{margin:0;font-size:clamp(22px,3vw,30px);line-height:1.1}
+header p{margin:4px 0 0;color:#c8d6ea;font-size:15px}
+main{padding:14px max(3vw,14px) 40px;max-width:1500px;margin:auto}
+.ops{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+.grp{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.grp+.grp{border-left:1px solid var(--line);padding-left:14px}
+label.lb{font-size:14px;color:var(--mute)}
+input[type=text]{font:16px "JetBrains Mono",monospace;width:9.5em;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink)}
+button,select{font:600 15px "Source Sans 3",sans-serif;min-height:40px;padding:6px 12px;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer}
+button:hover{border-color:var(--navyink)}
+button.pri{background:var(--navy);color:#fff;border-color:var(--navy)}
+button.pri:hover{background:#123f7d}
+button:focus-visible,select:focus-visible,input:focus-visible{outline:3px solid var(--gold);outline-offset:1px}
+button:disabled{opacity:.45;cursor:default}
+.palco{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,3fr);gap:14px;margin-top:14px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.tit{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--line);font-weight:700;color:var(--navyink);font-size:15px}
+.tit small{font-weight:400;color:var(--mute)}
+pre.cod{margin:0;padding:8px 0;background:var(--codebg);font:13px/1.62 "JetBrains Mono",monospace;overflow:auto;max-height:560px}
+pre.cod div{padding:0 12px 0 10px;border-left:4px solid transparent;white-space:pre}
+pre.cod div.at{background:var(--larcl);border-left-color:var(--lar)}
+pre.cod div.at.err{background:var(--vermcl);border-left-color:var(--verm)}
+pre.cod .n{display:inline-block;width:2.2em;color:var(--mute);opacity:.6;user-select:none}
+.kw{color:light-dark(#0b2d5b,#8fb5ec);font-weight:600}.cm{color:var(--verde);font-style:italic}.st{color:light-dark(#9a5a12,#e0a45a)}
+.fig{position:relative;height:420px;background:var(--card)}
+.fig svg{position:absolute;inset:0;width:100%;height:100%}
+.nota{margin:10px 12px;padding:9px 12px;border-radius:8px;background:var(--larcl);border-left:4px solid var(--lar);min-height:44px}
+.nota.err{background:var(--vermcl);border-left-color:var(--verm)}
+.nota code,.tela code{font:13.5px "JetBrains Mono",monospace}
+.baixo{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:0;border-top:1px solid var(--line)}
+.mem{padding:8px 12px;font:13px "JetBrains Mono",monospace}
+.mem h3,.telab h3{margin:0 0 6px;font:700 13px "Source Sans 3",sans-serif;color:var(--mute)}
+.fr{display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:4px 6px;margin-top:4px;border:1px solid var(--line);border-radius:6px}
+.fr.top{border-color:var(--lar);background:var(--larcl)}
+.fr .nm{flex:1 1 8.5em;color:var(--mute)}
+.cel{border:1px solid var(--noborda);background:var(--card);padding:0 6px;border-radius:3px}
+.cel i{font-style:normal;color:var(--mute)}
+.telab{padding:4px 12px 12px}
+.tela{background:#111b27;color:#7ee2a0;font:15px "JetBrains Mono",monospace;padding:8px 10px;border-radius:6px;min-height:40px;overflow-wrap:anywhere}
+.res{margin-top:8px;font-size:15px}
+.player{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:14px;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:8px 12px}
+.player input[type=range]{flex:1 1 200px;accent-color:var(--navy);min-height:40px}
+.cont{font:14px "JetBrains Mono",monospace;color:var(--mute);white-space:nowrap}
+.chk{display:flex;gap:6px;align-items:center;font-size:15px}
+.chk input{width:18px;height:18px;accent-color:var(--navy)}
+.log{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;font:13px "JetBrains Mono",monospace}
+.log span{padding:2px 8px;border-radius:12px;background:var(--no);color:var(--navyink)}
+.log span.e{background:var(--vermcl);color:var(--verm)}
+details{margin-top:16px;background:var(--card);border:1px solid var(--line);border-radius:10px}
+summary{cursor:pointer;padding:12px;font-weight:700;color:var(--navyink)}
+details pre{margin:0;max-height:none;border-top:1px solid var(--line)}
+.leg{display:flex;flex-wrap:wrap;gap:12px;font-size:14px;color:var(--mute);margin-top:10px}
+.leg b{display:inline-block;width:14px;height:14px;border-radius:50%;vertical-align:-2px;margin-right:4px;border:2px solid}
+@media(max-width:900px){.palco{grid-template-columns:minmax(0,1fr)}.cardcod{order:2}pre.cod{max-height:340px}}
+@media(max-width:600px){.grp+.grp{border-left:0;padding-left:0}pre.cod{font-size:12.5px}}
+@media(prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<header>
+  <h1>Simulador de Árvore Binária de Pesquisa</h1>
+  <p>Algoritmos e Estruturas de Dados · PUC Minas · o teste de mesa da classe <code>ArvoreBinaria</code> em C#, linha a linha</p>
+</header>
+<main>
+  <div class="ops" role="group" aria-label="Operações">
+    <div class="grp">
+      <label class="lb" for="val">Valor(es)</label>
+      <input type="text" id="val" value="62" inputmode="numeric" autocomplete="off" aria-describedby="dicaval">
+      <button class="pri" id="bIns">Inserir</button>
+      <button class="pri" id="bPes">Pesquisar</button>
+      <button class="pri" id="bRem">Remover</button>
+    </div>
+    <div class="grp">
+      <button id="bPre" title="V E D">Pré-ordem</button>
+      <button id="bCen" title="E V D">Em-ordem</button>
+      <button id="bPos" title="E D V">Pós-ordem</button>
+    </div>
+    <div class="grp">
+      <button id="bMin">Mínimo</button>
+      <button id="bMax">Máximo</button>
+    </div>
+    <div class="grp">
+      <button id="bEx">Árvore de exemplo</button>
+      <button id="bAle">Aleatória</button>
+      <button id="bLim">Esvaziar</button>
+    </div>
+  </div>
+  <p id="dicaval" class="leg" style="margin:6px 2px 0">Digite um número inteiro. Vários números separados por espaço ou vírgula (ex.: 50 30 70) são inseridos de uma vez, sem passo a passo.</p>
+
+  <div class="palco">
+    <section class="card cardcod" aria-label="Código em execução">
+      <div class="tit"><span id="codTit">Código</span><small>classe ArvoreBinaria</small></div>
+      <pre class="cod" id="cod"></pre>
+    </section>
+    <section class="card" aria-label="Árvore e memória">
+      <div class="tit"><span>Memória: pilha de execução e árvore</span><small id="info"></small></div>
+      <div class="fig"><svg id="svg" role="img" aria-label="Pilha de execução e árvore na memória"></svg></div>
+      <div class="nota" id="nota" aria-live="polite"></div>
+      <div class="telab"><h3>Tela</h3><div class="tela" id="tela"></div><div class="res" id="res"></div></div>
+    </section>
+  </div>
+
+  <div class="player" role="group" aria-label="Controle dos passos">
+    <button id="pIni" title="Primeiro passo" aria-label="Primeiro passo">⏮</button>
+    <button id="pAnt" title="Passo anterior (←)" aria-label="Passo anterior">◀</button>
+    <button id="pPlay" class="pri" title="Executar / pausar (espaço)" aria-label="Executar ou pausar" style="min-width:150px">▶ Executar</button>
+    <button id="pPro" title="Próximo passo (→)" aria-label="Próximo passo">▶|</button>
+    <button id="pFim" title="Último passo" aria-label="Último passo">⏭</button>
+    <input type="range" id="pBar" min="0" max="0" value="0" aria-label="Passo">
+    <span class="cont" id="pCont">0/0</span>
+    <select id="modo" aria-label="Modo de execução">
+      <option value="auto">Execução automática</option><option value="manual">Um passo por clique</option>
+    </select>
+    <select id="vel" aria-label="Velocidade">
+      <option value="1600">0,5×</option><option value="900" selected>1×</option><option value="450">2×</option><option value="200">4×</option>
+    </select>
+    <label class="chk"><input type="checkbox" id="passo" checked> passo a passo</label>
+    <label class="chk"><input type="checkbox" id="nulos" checked> mostrar null</label>
+  </div>
+  <div class="leg">
+    <span><b style="background:var(--larcl);border-color:var(--lar)"></b>caminho percorrido</span>
+    <span><b style="background:var(--lar);border-color:var(--lar)"></b>nó novo</span>
+    <span><b style="background:var(--verde);border-color:var(--verde)"></b>encontrado</span>
+    <span><b style="background:var(--verdecl);border-color:var(--verde)"></b>visitado</span>
+    <span><b style="background:var(--vermcl);border-color:var(--verm)"></b>a remover</span>
+    <span><b style="background:var(--roxocl);border-color:var(--roxo)"></b>procura do antecessor (j)</span>
+    <span><b style="background:var(--verdecl);border-color:var(--verde);border-radius:4px"></b>quem recebe o retorno</span>
+    <span>nas mensagens, <code>n(5)</code> = referência para o nó que guarda 5</span>
+  </div>
+  <div class="log" id="log" aria-label="Histórico de operações"></div>
+
+  <details>
+    <summary>Código completo da classe (ArvoreBinaria.cs)</summary>
+    <div style="padding:0 12px 10px;display:flex;gap:10px;align-items:center"><button id="bCopia">Copiar código</button><span id="copiado" class="leg" style="margin:0"></span></div>
+    <pre class="cod" id="full"></pre>
+  </details>
+</main>
+<script>
+/* Núcleo do simulador: modelo da ABP + geração dos passos (espelha ArvoreBinaria.cs) */
+const SNIP = {
+  ins: `public void Inserir(int x)
+{
+    _raiz = Inserir(x, _raiz);
+}
+
+// Insere x na subárvore cuja raiz é i e devolve a raiz dessa subárvore
+private No Inserir(int x, No? i)
+{
+    if (i == null)
+        return new No(x);
+    if (x < i.Elemento)
+        i.Esq = Inserir(x, i.Esq);
+    else if (x > i.Elemento)
+        i.Dir = Inserir(x, i.Dir);
+    else
+        throw new InvalidOperationException($"Elemento {x} já existe.");
+    return i;
+}`,
+  pes: `public bool Pesquisar(int x)
+{
+    return Pesquisar(x, _raiz);
+}
+
+private bool Pesquisar(int x, No? i)
+{
+    if (i == null)
+        return false;
+    if (x == i.Elemento)
+        return true;
+    if (x < i.Elemento)
+        return Pesquisar(x, i.Esq);
+    return Pesquisar(x, i.Dir);
+}`,
+  pre: `public void CaminharPre()
+{
+    CaminharPre(_raiz);
+    Console.WriteLine();
+}
+
+private void CaminharPre(No? i)
+{
+    if (i != null)
+    {
+        Console.Write(i.Elemento + " ");   // V
+        CaminharPre(i.Esq);                 // E
+        CaminharPre(i.Dir);                 // D
+    }
+}`,
+  cen: `public void CaminharCentral()
+{
+    CaminharCentral(_raiz);
+    Console.WriteLine();
+}
+
+private void CaminharCentral(No? i)
+{
+    if (i != null)
+    {
+        CaminharCentral(i.Esq);             // E
+        Console.Write(i.Elemento + " ");   // V
+        CaminharCentral(i.Dir);             // D
+    }
+}`,
+  pos: `public void CaminharPos()
+{
+    CaminharPos(_raiz);
+    Console.WriteLine();
+}
+
+private void CaminharPos(No? i)
+{
+    if (i != null)
+    {
+        CaminharPos(i.Esq);                 // E
+        CaminharPos(i.Dir);                 // D
+        Console.Write(i.Elemento + " ");   // V
+    }
+}`,
+  min: `public int Minimo()
+{
+    if (_raiz == null)
+        throw new InvalidOperationException("Árvore vazia.");
+    No i = _raiz;
+    while (i.Esq != null)
+        i = i.Esq;
+    return i.Elemento;
+}`,
+  max: `public int Maximo()
+{
+    if (_raiz == null)
+        throw new InvalidOperationException("Árvore vazia.");
+    No i = _raiz;
+    while (i.Dir != null)
+        i = i.Dir;
+    return i.Elemento;
+}`,
+  rem: `public void Remover(int x)
+{
+    _raiz = Remover(x, _raiz);
+}
+
+// Remove x da subárvore cuja raiz é i e devolve a (nova) raiz dessa subárvore
+private No? Remover(int x, No? i)
+{
+    if (i == null)
+        throw new InvalidOperationException($"Elemento {x} não encontrado.");
+    if (x < i.Elemento)
+        i.Esq = Remover(x, i.Esq);
+    else if (x > i.Elemento)
+        i.Dir = Remover(x, i.Dir);
+    else if (i.Dir == null)
+        i = i.Esq;                        // casos 1 e 2: sem filho direito
+    else if (i.Esq == null)
+        i = i.Dir;                        // caso 2: só filho direito
+    else
+        i.Esq = MaiorEsq(i, i.Esq);       // caso 3: dois filhos
+    return i;
+}
+
+// Procura o maior elemento da subárvore j (o antecessor de i),
+// copia-o para i e remove o nó onde ele estava
+private No? MaiorEsq(No i, No j)
+{
+    if (j.Dir != null)
+    {
+        j.Dir = MaiorEsq(i, j.Dir);
+        return j;
+    }
+    i.Elemento = j.Elemento;
+    return j.Esq;
+}`
+};
+const LINES = {};
+for (const k in SNIP) LINES[k] = SNIP[k].split('\n');
+// índice da linha que contém o texto (a partir de 'depois')
+function ln(k, txt, depois = 0) {
+  const a = LINES[k];
+  for (let n = depois; n < a.length; n++) if (a[n].includes(txt)) return n;
+  throw new Error('linha não encontrada: ' + k + ' / ' + txt);
+}
+
+/* ---------------- modelo ---------------- */
+class Modelo {
+  constructor() { this.nos = new Map(); this.raiz = null; this.prox = 1; }
+  novo(v) { const id = this.prox++; this.nos.set(id, { v, e: null, d: null }); return id; }
+  snap() { const o = {}; for (const [id, n] of this.nos) o[id] = { v: n.v, e: n.e, d: n.d }; return { raiz: this.raiz, nos: o }; }
+  restaura(s) { this.nos = new Map(Object.entries(s.nos).map(([k, n]) => [+k, { ...n }])); this.raiz = s.raiz; this.prox = Math.max(0, ...this.nos.keys()) + 1; }
+  // operações diretas (sem passos)
+  inserir(x) {
+    const ins = i => { if (i == null) return this.novo(x); const n = this.nos.get(i);
+      if (x < n.v) n.e = ins(n.e); else if (x > n.v) n.d = ins(n.d); else throw new Error(`Elemento ${x} já existe.`); return i; };
+    this.raiz = ins(this.raiz);
+  }
+  remover(x) {
+    const maior = (i, j) => { const nj = this.nos.get(j); if (nj.d != null) { nj.d = maior(i, nj.d); return j; }
+      this.nos.get(i).v = nj.v; this.nos.delete(j); return nj.e; };
+    const rem = i => { if (i == null) throw new Error(`Elemento ${x} não encontrado.`); const n = this.nos.get(i);
+      if (x < n.v) n.e = rem(n.e); else if (x > n.v) n.d = rem(n.d);
+      else if (n.d == null) { this.nos.delete(i); return n.e; }
+      else if (n.e == null) { this.nos.delete(i); return n.d; }
+      else n.e = maior(i, n.e); return i; };
+    this.raiz = rem(this.raiz);
+  }
+  ordem(tipo) {
+    const r = []; const f = i => { if (i == null) return; const n = this.nos.get(i);
+      if (tipo === 'pre') r.push(n.v); f(n.e); if (tipo === 'cen') r.push(n.v); f(n.d); if (tipo === 'pos') r.push(n.v); };
+    f(this.raiz); return r;
+  }
+  altura() { const h = i => i == null ? -1 : 1 + Math.max(h(this.nos.get(i).e), h(this.nos.get(i).d)); return h(this.raiz); }
+  limpa() { for (const id of [...this.nos.keys()]) { let alc = false; const vis = i => { if (i == null) return; if (i === id) alc = true; vis(this.nos.get(i).e); vis(this.nos.get(i).d); }; vis(this.raiz); if (!alc) this.nos.delete(id); } }
+}
+
+/* ---------------- gerador de passos ---------------- */
+class Trace {
+  constructor(m, cod) { this.m = m; this.cod = cod; this.passos = []; this.pilha = []; this.marca = {}; this.aresta = {};
+    this.pend = new Set(); this.tela = null; this.raizTxt = null; this.solto = new Set(); }
+  ref(id) { return id == null ? 'null' : `n(${this.m.nos.get(id).v})`; }
+  passo(linha, nota, ptr = {}, extra = {}) {
+    this.passos.push({ cod: this.cod, linha: typeof linha === 'number' ? linha : ln(this.cod, linha), nota, ptr,
+      snap: this.m.snap(), marca: { ...this.marca }, aresta: { ...this.aresta }, pend: [...this.pend], solto: [...this.solto],
+      pilha: this.pilha.map(f => ({ nome: f.nome, vars: f.vars.map(v => [...v]), aguarda: f.aguarda })), tela: this.tela,
+      raiz: this.raizTxt ?? this.ref(this.m.raiz), ...extra });
+  }
+  alvo(id, pai, lado) { return id != null ? { no: id } : pai != null ? { nulo: [pai, lado] } : { vazio: true }; }
+}
+
+const b = s => `<b>${s}</b>`;
+let _M = null;
+function destTxt(d) { if (d.raiz) return '_raiz'; const v = _M && _M.nos.get(d.no) ? _M.nos.get(d.no).v : '?'; return `n(${v}).${d.lado === 'E' ? 'Esq' : 'Dir'}`; }
+const c = s => `<code>${s}</code>`;
+
+function traceInserir(m, x) {
+  _M = m;
+  const t = new Trace(m, 'ins');
+  t.pilha = [{ nome: 'Inserir(int x)', vars: [['x', x]] }];
+  t.passo('_raiz = Inserir(x, _raiz);', `Chamada ${c(`Inserir(${x})`)}: chama a versão privada passando ${c('_raiz')}`);
+  t.raizTxt = t.ref(m.raiz);
+  let erro = false;
+  const rec = (i, pai, lado) => {
+    const dest = pai == null ? { raiz: true } : { no: pai, lado };
+    t.pilha.push({ nome: 'Inserir(x, i)', vars: [['x', x], ['i', t.ref(i), i]] });
+    const a = t.alvo(i, pai, lado);
+    if (i != null) { t.marca[i] = 'cam'; if (pai != null) t.aresta[i] = 'cam'; }
+    t.passo('private No Inserir', `Nova chamada: ${c('i')} recebe uma cópia da referência, ${c('i = ' + t.ref(i))}`, { i: a });
+    t.passo('if (i == null)', `${c('i == null')}? ${b(i == null ? 'true' : 'false')}`, { i: a });
+    if (i == null) {
+      const id = m.novo(x);
+      if (pai == null) m.raiz = id; else { m.nos.get(pai)[lado === 'E' ? 'e' : 'd'] = id; t.pend.add(id); }
+      t.marca[id] = 'novo';
+      t.passo('return new No(x);', `Cria o nó ${c(`n(${x})`)} e ${b('devolve')} sua referência para quem chamou, que vai guardá-la em ${c(destTxt(dest))}`, {}, { ret: { de: id, para: dest } });
+      t.pilha.pop(); return id;
+    }
+    const v = m.nos.get(i).v;
+    let r;
+    if (x < v) {
+      t.passo('if (x < i.Elemento)', `${c(`${x} < ${v}`)}? ${b('true')}: o lugar do ${x} é à esquerda`, { i: a });
+      t.pilha.at(-1).aguarda = 'i.Esq';
+      t.passo('i.Esq = Inserir(x, i.Esq);', `Chama ${c('Inserir(x, i.Esq)')}; o resultado será guardado em ${c('i.Esq')}`, { i: a });
+      r = rec(m.nos.get(i).e, i, 'E'); if (erro) return i;
+      const novo = t.pend.has(r); t.pend.delete(r);
+      t.passo('i.Esq = Inserir(x, i.Esq);', `De volta: ${c('i.Esq = ' + t.ref(r))}${novo ? ' ' + b('(liga o novo nó)') : ' (não muda nada)'}`, { i: a }, { atrib: { no: i, lado: 'E' } });
+      t.pilha.at(-1).aguarda = undefined;
+    } else if (x > v) {
+      t.passo('if (x < i.Elemento)', `${c(`${x} < ${v}`)}? ${b('false')}`, { i: a });
+      t.passo('else if (x > i.Elemento)', `${c(`${x} > ${v}`)}? ${b('true')}: o lugar do ${x} é à direita`, { i: a });
+      t.pilha.at(-1).aguarda = 'i.Dir';
+      t.passo('i.Dir = Inserir(x, i.Dir);', `Chama ${c('Inserir(x, i.Dir)')}; o resultado será guardado em ${c('i.Dir')}`, { i: a });
+      r = rec(m.nos.get(i).d, i, 'D'); if (erro) return i;
+      const novo = t.pend.has(r); t.pend.delete(r);
+      t.passo('i.Dir = Inserir(x, i.Dir);', `De volta: ${c('i.Dir = ' + t.ref(r))}${novo ? ' ' + b('(liga o novo nó)') : ' (não muda nada)'}`, { i: a }, { atrib: { no: i, lado: 'D' } });
+      t.pilha.at(-1).aguarda = undefined;
+    } else {
+      t.passo('if (x < i.Elemento)', `${c(`${x} < ${v}`)}? ${b('false')}`, { i: a });
+      t.passo('else if (x > i.Elemento)', `${c(`${x} > ${v}`)}? ${b('false')}`, { i: a });
+      t.marca[i] = 'erro';
+      t.passo('throw new', `O ${x} ${b('já existe')}: lança ${c('InvalidOperationException')} e a inserção é interrompida`, { i: a }, { erro: true });
+      erro = true; return i;
+    }
+    t.passo('return i;', `${c('return i')}: devolve ${c(t.ref(i))} para quem chamou, que vai guardá-lo em ${c(destTxt(dest))}`, { i: a }, { ret: { de: i, para: dest } });
+    t.pilha.pop(); return i;
+  };
+  t.pilha[0].aguarda = '_raiz';
+  const antes = m.raiz;
+  const r = rec(m.raiz, null, null);
+  if (erro) { t.pilha = []; t.raizTxt = null; t.marca = {}; t.aresta = {}; t.passo(LINES.ins.length - 1, `A exceção chega a quem chamou ${c(`Inserir(${x})`)}. A árvore não mudou.`, {}, { erro: true }); return t.passos; }
+  t.pilha = [{ nome: 'Inserir(int x)', vars: [['x', x]] }];
+  t.raizTxt = null;
+  t.passo('_raiz = Inserir(x, _raiz);', `De volta: ${c('_raiz = ' + t.ref(r))}${antes == null ? ' (a árvore estava vazia: o novo nó vira a raiz)' : ' (não muda nada)'}`, {}, { atrib: { raiz: true } });
+  t.pilha = []; t.marca = { [findId(m, x)]: 'novo' }; t.aresta = {};
+  t.passo(3, `Fim: ${x} inserido`);
+  return t.passos;
+}
+function findId(m, x) { let i = m.raiz; while (i != null) { const n = m.nos.get(i); if (n.v === x) return i; i = x < n.v ? n.e : n.d; } return null; }
+
+function tracePesquisar(m, x) {
+  const t = new Trace(m, 'pes');
+  t.pilha = [{ nome: 'Pesquisar(int x)', vars: [['x', x]] }];
+  t.passo('return Pesquisar(x, _raiz);', `Chamada ${c(`Pesquisar(${x})`)}`);
+  const rec = (i, pai, lado) => {
+    t.pilha.push({ nome: 'Pesquisar(x, i)', vars: [['x', x], ['i', t.ref(i), i]] });
+    const a = t.alvo(i, pai, lado);
+    if (i != null) { t.marca[i] = 'cam'; if (pai != null) t.aresta[i] = 'cam'; }
+    t.passo('private bool Pesquisar', `Nova chamada com ${c('i = ' + t.ref(i))}`, { i: a });
+    t.passo('if (i == null)', `${c('i == null')}? ${b(i == null ? 'true' : 'false')}`, { i: a });
+    if (i == null) { t.passo('return false;', `Chegou a uma referência ${c('null')}: o ${x} não está aqui. ${b('Devolve false')}`, { i: a }); t.pilha.pop(); return false; }
+    const v = m.nos.get(i).v;
+    if (x === v) {
+      t.passo('if (x == i.Elemento)', `${c(`${x} == ${v}`)}? ${b('true')}`, { i: a });
+      t.marca[i] = 'achou';
+      t.passo('return true;', `Encontrou: ${b('devolve true')}`, { i: a }); t.pilha.pop(); return true;
+    }
+    t.passo('if (x == i.Elemento)', `${c(`${x} == ${v}`)}? ${b('false')}`, { i: a });
+    let r;
+    if (x < v) {
+      t.passo('if (x < i.Elemento)', `${c(`${x} < ${v}`)}? ${b('true')}: só pode estar à esquerda`, { i: a });
+      t.passo('return Pesquisar(x, i.Esq);', `Chama ${c('Pesquisar(x, i.Esq)')}`, { i: a });
+      r = rec(m.nos.get(i).e, i, 'E');
+      t.passo('return Pesquisar(x, i.Esq);', `Repassa o resultado: ${b('devolve ' + r)}`, { i: a });
+    } else {
+      t.passo('if (x < i.Elemento)', `${c(`${x} < ${v}`)}? ${b('false')}: só pode estar à direita`, { i: a });
+      t.passo('return Pesquisar(x, i.Dir);', `Chama ${c('Pesquisar(x, i.Dir)')}`, { i: a });
+      r = rec(m.nos.get(i).d, i, 'D');
+      t.passo('return Pesquisar(x, i.Dir);', `Repassa o resultado: ${b('devolve ' + r)}`, { i: a });
+    }
+    t.pilha.pop(); return r;
+  };
+  const r = rec(m.raiz, null, null);
+  t.pilha = [{ nome: 'Pesquisar(int x)', vars: [['x', x]] }];
+  t.passo('return Pesquisar(x, _raiz);', `${c(`Pesquisar(${x})`)} devolve ${b(r)}`, {}, { resultado: r });
+  return t.passos;
+}
+
+function traceCaminhar(m, tipo) {
+  const nomes = { pre: 'CaminharPre', cen: 'CaminharCentral', pos: 'CaminharPos' };
+  const N = nomes[tipo];
+  const t = new Trace(m, tipo);
+  t.tela = '';
+  t.pilha = [{ nome: N + '()', vars: [] }];
+  t.passo(`${N}(_raiz);`, `Chama a versão privada passando ${c('_raiz')}`);
+  const lin = { V: ln(tipo, 'Console.Write('), E: ln(tipo, `${N}(i.Esq)`), D: ln(tipo, `${N}(i.Dir)`) };
+  const ordem = { pre: 'VED', cen: 'EVD', pos: 'EDV' }[tipo];
+  const rec = (i, pai, lado) => {
+    t.pilha.push({ nome: N + '(i)', vars: [['i', t.ref(i), i]] });
+    const a = t.alvo(i, pai, lado);
+    if (i != null && t.marca[i] !== 'visit') t.marca[i] = 'cam';
+    t.passo(`private void ${N}`, `Nova chamada com ${c('i = ' + t.ref(i))}`, { i: a });
+    t.passo('if (i != null)', `${c('i != null')}? ${b(i == null ? 'false' : 'true')}${i == null ? ': nada a fazer, volta' : ''}`, { i: a });
+    if (i == null) { t.pilha.pop(); return; }
+    for (const p of ordem) {
+      if (p === 'V') {
+        t.tela += m.nos.get(i).v + ' '; t.marca[i] = 'visit';
+        t.passo(lin.V, `${b('V')}isita: escreve ${m.nos.get(i).v} na tela`, { i: a });
+      } else {
+        const filho = p === 'E' ? m.nos.get(i).e : m.nos.get(i).d;
+        t.passo(lin[p], `Percorre a subárvore ${b(p === 'E' ? 'esquerda' : 'direita')} (${p})`, { i: a });
+        rec(filho, i, p);
+        t.passo(lin[p], `Voltou da subárvore ${p === 'E' ? 'esquerda' : 'direita'} do ${m.nos.get(i).v}`, { i: a });
+      }
+    }
+    t.pilha.pop();
+  };
+  rec(m.raiz, null, null);
+  t.pilha = [{ nome: N + '()', vars: [] }];
+  t.passo('Console.WriteLine();', `Fim do caminhamento ${{ pre: 'pré-ordem (V E D)', cen: 'em-ordem (E V D): saiu em ordem crescente', pos: 'pós-ordem (E D V)' }[tipo]}`);
+  return t.passos;
+}
+
+function traceExtremo(m, tipo) {
+  const k = tipo, campo = tipo === 'min' ? 'e' : 'd', Nm = tipo === 'min' ? 'Esq' : 'Dir';
+  const t = new Trace(m, k);
+  t.pilha = [{ nome: tipo === 'min' ? 'Minimo()' : 'Maximo()', vars: [['i', '?']] }];
+  t.passo('if (_raiz == null)', `${c('_raiz == null')}? ${b(m.raiz == null ? 'true' : 'false')}`);
+  if (m.raiz == null) { t.passo('throw new', `Árvore vazia: lança exceção`, {}, { erro: true }); return t.passos; }
+  let i = m.raiz;
+  t.pilha[0].vars = [['i', t.ref(i), i]]; t.marca[i] = 'cam';
+  t.passo('No i = _raiz;', `${c('i')} começa na raiz`, { i: { no: i } });
+  while (true) {
+    const f = m.nos.get(i)[campo];
+    t.passo(`while (i.${Nm} != null)`, `${c(`i.${Nm} != null`)}? ${b(f != null ? 'true' : 'false')}`, { i: { no: i } });
+    if (f == null) break;
+    i = f; t.marca[i] = 'cam'; t.aresta[i] = 'cam'; t.pilha[0].vars = [['i', t.ref(i), i]];
+    t.passo(`i = i.${Nm};`, `Desce à ${tipo === 'min' ? 'esquerda' : 'direita'}: ${c('i = ' + t.ref(i))}`, { i: { no: i } });
+  }
+  t.marca[i] = 'achou';
+  t.passo('return i.Elemento;', `Devolve ${b(m.nos.get(i).v)}: o ${tipo === 'min' ? 'menor' : 'maior'} elemento`, { i: { no: i } }, { resultado: m.nos.get(i).v });
+  return t.passos;
+}
+
+function traceRemover(m, x) {
+  _M = m;
+  const t = new Trace(m, 'rem');
+  t.pilha = [{ nome: 'Remover(int x)', vars: [['x', x]] }];
+  t.passo('_raiz = Remover(x, _raiz);', `Chamada ${c(`Remover(${x})`)}`);
+  t.raizTxt = t.ref(m.raiz);
+  let erro = false;
+  const maior = (i, j, dest) => {
+    t.pilha.push({ nome: 'MaiorEsq(i, j)', vars: [['i', t.ref(i), i], ['j', t.ref(j), j]] });
+    t.marca[j] = 'roxo'; t.aresta[j] = 'cam';
+    t.passo('private No? MaiorEsq', `Procura o antecessor a partir de ${c('j = ' + t.ref(j))}`, { i: { no: i }, j: { no: j } });
+    const nj = m.nos.get(j);
+    t.passo('if (j.Dir != null)', `${c('j.Dir != null')}? ${b(nj.d != null ? 'true' : 'false')}`, { i: { no: i }, j: { no: j } });
+    if (nj.d != null) {
+      t.pilha.at(-1).aguarda = 'j.Dir';
+      t.passo('j.Dir = MaiorEsq(i, j.Dir);', `Desce à direita: ${c('MaiorEsq(i, j.Dir)')}; o resultado será guardado em ${c('j.Dir')}`, { i: { no: i }, j: { no: j } });
+      const r = maior(i, nj.d, { no: j, lado: 'D' });
+      const saiu = nj.d; nj.d = r; m.nos.delete(saiu === r ? -1 : saiu); t.solto.delete(saiu);
+      t.passo('j.Dir = MaiorEsq(i, j.Dir);', `De volta: ${c('j.Dir = ' + t.ref(r))}${saiu !== r ? ': o nó original do antecessor ' + b('sai da árvore') : ' (não muda nada)'}`, { i: { no: i }, j: { no: j } }, { atrib: { no: j, lado: 'D' } });
+      t.pilha.at(-1).aguarda = undefined;
+      t.passo('return j;', `${c('return j')}: devolve ${c(t.ref(j))}, que será guardado em ${c(destTxt(dest))}`, { i: { no: i }, j: { no: j } }, { ret: { de: j, para: dest } });
+      t.pilha.pop(); return j;
+    }
+    t.passo('i.Elemento = j.Elemento;', `${c('j.Dir')} é ${c('null')}: ${c('j')} é o ${b('antecessor')} (${nj.v})`, { i: { no: i }, j: { no: j } });
+    m.nos.get(i).v = nj.v;
+    t.marca[i] = 'achou'; t.marca[j] = 'erro'; t.solto.add(j);
+    t.pilha[t.pilha.length - 1].vars = [['i', t.ref(i), i], ['j', t.ref(j), j]];
+    t.passo('i.Elemento = j.Elemento;', `O nó ${c('i')} passa a guardar ${nj.v}. Falta tirar o nó original do ${nj.v}`, { i: { no: i }, j: { no: j } });
+    t.passo('return j.Esq;', `${c('return j.Esq')}: devolve ${c(t.ref(nj.e))}, que será guardado em ${c(destTxt(dest))} no lugar de ${c('j')}`, { i: { no: i }, j: { no: j } }, { ret: { de: nj.e, para: dest } });
+    t.pilha.pop(); return nj.e;
+  };
+  const rec = (i, pai, lado) => {
+    const dest = pai == null ? { raiz: true } : { no: pai, lado };
+    t.pilha.push({ nome: 'Remover(x, i)', vars: [['x', x], ['i', t.ref(i), i]] });
+    const a = t.alvo(i, pai, lado);
+    if (i != null) { t.marca[i] = 'cam'; if (pai != null) t.aresta[i] = 'cam'; }
+    t.passo('private No? Remover', `Nova chamada com ${c('i = ' + t.ref(i))}`, { i: a });
+    t.passo('if (i == null)', `${c('i == null')}? ${b(i == null ? 'true' : 'false')}`, { i: a });
+    if (i == null) {
+      t.passo('throw new', `O ${x} ${b('não está')} na árvore: lança ${c('InvalidOperationException')}`, { i: a }, { erro: true });
+      erro = true; return null;
+    }
+    const n = m.nos.get(i), v = n.v;
+    if (x < v) {
+      t.passo('if (x < i.Elemento)', `${c(`${x} < ${v}`)}? ${b('true')}`, { i: a });
+      t.pilha.at(-1).aguarda = 'i.Esq';
+      t.passo('i.Esq = Remover(x, i.Esq);', `Chama ${c('Remover(x, i.Esq)')}; o resultado será guardado em ${c('i.Esq')}`, { i: a });
+      const antigo = n.e; const r = rec(n.e, i, 'E'); if (erro) return i;
+      n.e = r; if (antigo !== r) { m.nos.delete(antigo); t.solto.delete(antigo); }
+      t.passo('i.Esq = Remover(x, i.Esq);', `De volta: ${c('i.Esq = ' + t.ref(r))}${antigo !== r ? ' ' + b('(religa)') : ' (não muda nada)'}`, { i: a }, { atrib: { no: i, lado: 'E' } });
+      t.pilha.at(-1).aguarda = undefined;
+    } else if (x > v) {
+      t.passo('if (x < i.Elemento)', `${c(`${x} < ${v}`)}? ${b('false')}`, { i: a });
+      t.passo('else if (x > i.Elemento)', `${c(`${x} > ${v}`)}? ${b('true')}`, { i: a });
+      t.pilha.at(-1).aguarda = 'i.Dir';
+      t.passo('i.Dir = Remover(x, i.Dir);', `Chama ${c('Remover(x, i.Dir)')}; o resultado será guardado em ${c('i.Dir')}`, { i: a });
+      const antigo = n.d; const r = rec(n.d, i, 'D'); if (erro) return i;
+      n.d = r; if (antigo !== r) { m.nos.delete(antigo); t.solto.delete(antigo); }
+      t.passo('i.Dir = Remover(x, i.Dir);', `De volta: ${c('i.Dir = ' + t.ref(r))}${antigo !== r ? ' ' + b('(religa)') : ' (não muda nada)'}`, { i: a }, { atrib: { no: i, lado: 'D' } });
+      t.pilha.at(-1).aguarda = undefined;
+    } else {
+      t.passo('if (x < i.Elemento)', `${c(`${x} < ${v}`)}? ${b('false')}`, { i: a });
+      t.passo('else if (x > i.Elemento)', `${c(`${x} > ${v}`)}? ${b('false')}: ${b('achou')} o nó a remover`, { i: a });
+      t.marca[i] = 'erro';
+      if (n.d == null) {
+        t.solto.add(i);
+        t.passo('i = i.Esq;', `${c('i.Dir == null')}? ${b('true')} (${n.e == null ? 'folha, caso 1' : 'só filho esquerdo, caso 2'}): ${c('i = ' + t.ref(n.e))}`, { i: t.alvo(n.e, i, 'E') });
+        t.passo('return i;', `Devolve ${c(t.ref(n.e))}, que será guardado em ${c(destTxt(dest))} no lugar do nó ${v}`, { i: t.alvo(n.e, i, 'E') }, { ret: { de: n.e, para: dest } });
+        t.pilha.pop(); return n.e;
+      }
+      t.passo('else if (i.Dir == null)', `${c('i.Dir == null')}? ${b('false')}`, { i: a });
+      if (n.e == null) {
+        t.solto.add(i);
+        t.passo('i = i.Dir;', `${c('i.Esq == null')}? ${b('true')} (só filho direito, caso 2): ${c('i = ' + t.ref(n.d))}`, { i: { no: n.d } });
+        t.passo('return i;', `Devolve ${c(t.ref(n.d))}, que será guardado em ${c(destTxt(dest))} no lugar do nó ${v}`, { i: { no: n.d } }, { ret: { de: n.d, para: dest } });
+        t.pilha.pop(); return n.d;
+      }
+      t.passo('else if (i.Esq == null)', `${c('i.Esq == null')}? ${b('false')}: o nó tem ${b('dois filhos')} (caso 3)`, { i: a });
+      t.pilha.at(-1).aguarda = 'i.Esq';
+      t.passo('i.Esq = MaiorEsq(i, i.Esq);', `Chama ${c('MaiorEsq(i, i.Esq)')}; o resultado será guardado em ${c('i.Esq')}`, { i: a });
+      const antigo = n.e; const r = maior(i, n.e, { no: i, lado: 'E' });
+      n.e = r; if (antigo !== r) { m.nos.delete(antigo); t.solto.delete(antigo); }
+      for (const k in t.marca) if (t.marca[k] === 'roxo') delete t.marca[k];
+      t.passo('i.Esq = MaiorEsq(i, i.Esq);', `De volta: ${c('i.Esq = ' + t.ref(r))}`, { i: a }, { atrib: { no: i, lado: 'E' } });
+      t.pilha.at(-1).aguarda = undefined;
+    }
+    t.passo('return i;', `${c('return i')}: devolve ${c(t.ref(i))}, que será guardado em ${c(destTxt(dest))}`, { i: a }, { ret: { de: i, para: dest } });
+    t.pilha.pop(); return i;
+  };
+  t.pilha[0].aguarda = '_raiz';
+  const antigoR = m.raiz;
+  const r = rec(m.raiz, null, null);
+  if (erro) { t.pilha = []; t.raizTxt = null; t.marca = {}; t.aresta = {}; t.passo(LINES.rem.length - 1, `A exceção chega a quem chamou ${c(`Remover(${x})`)}. A árvore não mudou.`, {}, { erro: true }); return t.passos; }
+  m.raiz = r; if (antigoR !== r && antigoR != null) { m.nos.delete(antigoR); t.solto.delete(antigoR); }
+  t.raizTxt = null;
+  t.pilha = [{ nome: 'Remover(int x)', vars: [['x', x]] }];
+  t.passo('_raiz = Remover(x, _raiz);', `De volta: ${c('_raiz = ' + t.ref(r))}`, {}, { atrib: { raiz: true } });
+  t.pilha = []; t.marca = {}; t.aresta = {};
+  t.passo(3, `Fim: ${x} removido`);
+  return t.passos;
+}
+
+if (typeof module !== 'undefined') module.exports = { Modelo, traceInserir, tracePesquisar, traceCaminhar, traceExtremo, traceRemover, LINES, SNIP };
+
+const FONTE = "// =====================================================================\n//  Árvore Binária de Pesquisa (ABP)\n//  Algoritmos e Estruturas de Dados — PUC Minas\n//  Prof. Rodrigo Richard Gomes\n//\n//  Convenções: atributos privados em _camelCase, dados públicos como\n//  propriedades. Não são admitidos elementos repetidos. Na remoção de um\n//  nó com dois filhos, usa-se o antecessor (maior da subárvore esquerda).\n// =====================================================================\nusing System;\n\nnamespace AED\n{\n    public class No\n    {\n        public int Elemento { get; set; }\n        public No? Esq { get; set; }    // filho esquerdo (null se não existir)\n        public No? Dir { get; set; }    // filho direito  (null se não existir)\n\n        public No(int elemento)\n        {\n            Elemento = elemento;\n            Esq = null;\n            Dir = null;\n        }\n    }\n\n    public class ArvoreBinaria\n    {\n        private No? _raiz;      // árvore vazia: _raiz == null\n\n        public ArvoreBinaria()\n        {\n            _raiz = null;\n        }\n\n        // ------------------------------------------------------- inserção\n        public void Inserir(int x)\n        {\n            _raiz = Inserir(x, _raiz);\n        }\n\n        // Insere x na subárvore cuja raiz é i e devolve a raiz dessa subárvore\n        private No Inserir(int x, No? i)\n        {\n            if (i == null)\n                return new No(x);\n            if (x < i.Elemento)\n                i.Esq = Inserir(x, i.Esq);\n            else if (x > i.Elemento)\n                i.Dir = Inserir(x, i.Dir);\n            else\n                throw new InvalidOperationException($\"Elemento {x} já existe.\");\n            return i;\n        }\n\n        // ------------------------------------------------------- pesquisa\n        public bool Pesquisar(int x)\n        {\n            return Pesquisar(x, _raiz);\n        }\n\n        private bool Pesquisar(int x, No? i)\n        {\n            if (i == null)\n                return false;\n            if (x == i.Elemento)\n                return true;\n            if (x < i.Elemento)\n                return Pesquisar(x, i.Esq);\n            return Pesquisar(x, i.Dir);\n        }\n\n        // ------------------------------------------------------- caminhamentos\n        public void CaminharPre()\n        {\n            CaminharPre(_raiz);\n            Console.WriteLine();\n        }\n\n        private void CaminharPre(No? i)\n        {\n            if (i != null)\n            {\n                Console.Write(i.Elemento + \" \");   // V\n                CaminharPre(i.Esq);                 // E\n                CaminharPre(i.Dir);                 // D\n            }\n        }\n\n        public void CaminharCentral()\n        {\n            CaminharCentral(_raiz);\n            Console.WriteLine();\n        }\n\n        private void CaminharCentral(No? i)\n        {\n            if (i != null)\n            {\n                CaminharCentral(i.Esq);             // E\n                Console.Write(i.Elemento + \" \");   // V\n                CaminharCentral(i.Dir);             // D\n            }\n        }\n\n        public void CaminharPos()\n        {\n            CaminharPos(_raiz);\n            Console.WriteLine();\n        }\n\n        private void CaminharPos(No? i)\n        {\n            if (i != null)\n            {\n                CaminharPos(i.Esq);                 // E\n                CaminharPos(i.Dir);                 // D\n                Console.Write(i.Elemento + \" \");   // V\n            }\n        }\n\n        // ------------------------------------------------------- menor e maior\n        public int Minimo()\n        {\n            if (_raiz == null)\n                throw new InvalidOperationException(\"Árvore vazia.\");\n            No i = _raiz;\n            while (i.Esq != null)\n                i = i.Esq;\n            return i.Elemento;\n        }\n\n        public int Maximo()\n        {\n            if (_raiz == null)\n                throw new InvalidOperationException(\"Árvore vazia.\");\n            No i = _raiz;\n            while (i.Dir != null)\n                i = i.Dir;\n            return i.Elemento;\n        }\n\n        // ------------------------------------------------------- remoção\n        public void Remover(int x)\n        {\n            _raiz = Remover(x, _raiz);\n        }\n\n        // Remove x da subárvore cuja raiz é i e devolve a (nova) raiz dessa subárvore\n        private No? Remover(int x, No? i)\n        {\n            if (i == null)\n                throw new InvalidOperationException($\"Elemento {x} não encontrado.\");\n            if (x < i.Elemento)\n                i.Esq = Remover(x, i.Esq);\n            else if (x > i.Elemento)\n                i.Dir = Remover(x, i.Dir);\n            else if (i.Dir == null)\n                i = i.Esq;                        // casos 1 e 2: sem filho direito\n            else if (i.Esq == null)\n                i = i.Dir;                        // caso 2: só filho direito\n            else\n                i.Esq = MaiorEsq(i, i.Esq);       // caso 3: dois filhos\n            return i;\n        }\n\n        // Procura o maior elemento da subárvore j (o antecessor de i),\n        // copia-o para i e remove o nó onde ele estava\n        private No? MaiorEsq(No i, No j)\n        {\n            if (j.Dir != null)\n            {\n                j.Dir = MaiorEsq(i, j.Dir);\n                return j;\n            }\n            i.Elemento = j.Elemento;\n            return j.Esq;\n        }\n\n        // ------------------------------------------------------- utilitários\n        public int Altura()\n        {\n            return Altura(_raiz);\n        }\n\n        private int Altura(No? i)\n        {\n            if (i == null)\n                return -1;\n            return 1 + Math.Max(Altura(i.Esq), Altura(i.Dir));\n        }\n\n        public int ContarNos()\n        {\n            return ContarNos(_raiz);\n        }\n\n        private int ContarNos(No? i)\n        {\n            if (i == null)\n                return 0;\n            return 1 + ContarNos(i.Esq) + ContarNos(i.Dir);\n        }\n    }\n}\n";
+{
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+const KW = /\b(public|private|void|int|bool|if|else|return|new|throw|null|class|while|namespace|using|true|false)\b/g;
+function colore(l) {
+  let com = '', i = l.indexOf('//');
+  if (i >= 0) { com = '<span class="cm">' + esc(l.slice(i)) + '</span>'; l = l.slice(0, i); }
+  const partes = l.split(/("[^"]*")/);
+  return partes.map((p, k) => k % 2 ? '<span class="st">' + esc(p) + '</span>' : esc(p).replace(KW, '<span class="kw">$1</span>')).join('') + com;
+}
+const TIT = { ins: 'Inserir', pes: 'Pesquisar', rem: 'Remover e MaiorEsq', pre: 'CaminharPre', cen: 'CaminharCentral', pos: 'CaminharPos', min: 'Minimo', max: 'Maximo' };
+
+const m = new Modelo();
+let passos = [], k = 0, timer = null, codAtual = null, posAnt = new Map(), anim = null;
+
+/* ---------------- código ---------------- */
+function mostraCodigo(cod, linha, erro) {
+  if (cod !== codAtual) {
+    $('cod').innerHTML = LINES[cod].map((l, n) => `<div><span class="n">${n + 1}</span>${colore(l)}</div>`).join('');
+    $('codTit').textContent = 'Código: ' + TIT[cod];
+    codAtual = cod;
+  }
+  const ds = $('cod').children;
+  for (let n = 0; n < ds.length; n++) ds[n].className = n === linha ? (erro ? 'at err' : 'at') : '';
+  const d = ds[linha];
+  if (d) { const p = $('cod'); const top = d.offsetTop - p.clientHeight / 2; p.scrollTo({ top: Math.max(0, top), behavior: 'smooth' }); }
+}
+
+/* ---------------- memória: pilha + árvore ---------------- */
+const R = 17, GX = 46, GY = 62;
+const SW = 240, FH = 50, FG = 8;     // largura da pilha, altura e espaço entre registros
+function layoutArv(s, ox, oy) {
+  const pos = new Map(); let ord = 0;
+  const f = (id, d) => { if (id == null) return; const n = s.nos[id]; f(n.e, d + 1); pos.set(id, { x: ox + ord++ * GX, y: oy + d * GY }); f(n.d, d + 1); };
+  f(s.raiz, 0);
+  return pos;
+}
+function geometria(p, vertical) {
+  // pilha
+  const quadros = p.pilha;
+  const pilhaY0 = 74;
+  const pilhaH = pilhaY0 + Math.max(1, quadros.length) * (FH + FG) + 6;
+  let ox, oy;
+  if (vertical) { ox = 30; oy = pilhaH + 56; } else { ox = SW + 74; oy = 58; }
+  return { pilhaY0, pilhaH, ox, oy };
+}
+function desenha(p, t = 1) {
+  const s = p.snap, svg = $('svg');
+  const cw = svg.clientWidth || 600;
+  const vertical = cw < 560;
+  const g = geometria(p, vertical);
+  const alvo = layoutArv(s, g.ox, g.oy);
+  const pos = new Map();
+  for (const [id, a] of alvo) { const o = posAnt.get(id); pos.set(id, o && t < 1 ? { x: o.x + (a.x - o.x) * t, y: o.y + (a.y - o.y) * t } : a); }
+  let W = vertical ? SW + 20 : SW + 120, H = g.pilhaH + 10;
+  for (const q of alvo.values()) { W = Math.max(W, q.x + 34); H = Math.max(H, q.y + 56); }
+  if (!alvo.size) { W = Math.max(W, vertical ? SW + 20 : SW + 330); H = Math.max(H, g.oy + 60); }
+  // altura do quadro acompanha o conteúdo
+  let esc_ = Math.min(1.35, cw / W);
+  const hAlvo = Math.max(320, Math.min(680, H * esc_ + 8));
+  if (Math.abs(svg.parentNode.clientHeight - hAlvo) > 2 && t >= 1) svg.parentNode.style.height = hAlvo + 'px';
+  esc_ = Math.min(esc_, (svg.parentNode.clientHeight || hAlvo) / H);
+  const vw = cw / esc_, vh = (svg.parentNode.clientHeight || hAlvo) / esc_;
+  svg.setAttribute('viewBox', `${-(vw - W) / 2} 0 ${vw} ${vh}`);
+  const css = getComputedStyle(document.documentElement);
+  const cor = v => css.getPropertyValue(v).trim();
+  const C = { lar: cor('--lar'), roxo: cor('--roxo'), verde: cor('--verde'), navy: cor('--navyink'), mute: cor('--mute'), ink: cor('--ink'), line: cor('--line'),
+    card: cor('--card'), larcl: cor('--larcl'), verdecl: cor('--verdecl'), no: cor('--no'), noborda: cor('--noborda') };
+  const est = {
+    tn: [C.no, C.noborda, C.ink], cam: [C.larcl, C.lar, C.ink], novo: [C.lar, '#a85a12', '#fff'], achou: [C.verde, '#1d5535', '#fff'],
+    visit: [C.verdecl, C.verde, C.verde], erro: [cor('--vermcl'), cor('--verm'), cor('--verm')], roxo: [cor('--roxocl'), C.roxo, C.roxo]
+  };
+  const T = (x, y, txt, o = '') => `<text x="${x}" y="${y}" ${o}>${esc(txt)}</text>`;
+  const mono = 'font-family="JetBrains Mono,monospace"';
+  const pend = new Set(p.pend), nulos = $('nulos').checked;
+  let fundo = '', arestas = '', nos = '', pilha = '', setas = '', extra = '';
+
+  // rótulos das áreas
+  fundo += T(10, 22, 'Pilha de execução (registros de ativação)', `font-size="12.5" font-weight="700" fill="${C.mute}"`);
+  fundo += T(vertical ? 10 : g.ox - 14, vertical ? g.oy - 34 : 22, 'Heap: os nós da árvore', `font-size="12.5" font-weight="700" fill="${C.mute}"`);
+  if (!vertical) fundo += `<line x1="${SW + 30}" y1="8" x2="${SW + 40}" y2="${Math.max(H, vh) - 8}" stroke="${C.line}" stroke-dasharray="4 5"/>`;
+
+  // arestas e nulos
+  const stubs = {};
+  for (const [id, q] of pos) {
+    const no = s.nos[id];
+    for (const [lado, f, sx] of [['E', no.e, -1], ['D', no.d, 1]]) {
+      const recebe = (p.atrib && p.atrib.no === id && p.atrib.lado === lado);
+      if (f != null && pos.has(f)) {
+        const r = pos.get(f), ec = p.aresta[f] === 'cam';
+        const st = recebe ? `stroke="${C.verde}" stroke-width="4"` : `stroke="${ec ? C.lar : C.noborda}" stroke-width="${ec ? 3.5 : 1.8}"`;
+        arestas += `<line x1="${q.x}" y1="${q.y}" x2="${r.x}" y2="${r.y}" ${st} ${pend.has(f) ? 'stroke-dasharray="5 5" opacity=".55"' : ''}/>`;
+      } else {
+        const cx = q.x + sx * 15, cy = q.y + 34; stubs[id + lado] = { x: cx, y: cy };
+        if (nulos) arestas += `<path d="M${q.x + sx * 8} ${q.y + 15}L${cx} ${cy}M${cx - 6} ${cy}h12M${cx - 3.5} ${cy + 3}h7" stroke="${C.mute}" stroke-width="1.2" fill="none" opacity=".7"/>`;
+      }
+    }
+  }
+  for (const [id, q] of pos) {
+    const [f, b_, tx] = est[p.marca[id]] || est.tn;
+    nos += `<circle cx="${q.x}" cy="${q.y}" r="${R}" fill="${f}" stroke="${b_}" stroke-width="2.2"/>` + T(q.x, q.y + 5, s.nos[id].v, `text-anchor="middle" font-weight="700" font-size="14" fill="${tx}"`);
+  }
+  if (!alvo.size) nos += T(g.ox + 110, g.oy + 4, 'nenhum nó (árvore vazia)', `text-anchor="middle" fill="${C.mute}" font-size="14"`);
+
+  // seta de uma referência (célula -> nó ou -> posição de null)
+  const curva = (x1, y1, alvoXY, rr, corr, largura, tracejada) => {
+    const { x, y } = alvoXY;
+    const c1x = vertical ? x1 + 40 : x1 + 70, c1y = y1;
+    const c2x = vertical ? x : x - 80, c2y = vertical ? y - 70 : y;
+    const ang = Math.atan2(y - c2y, x - c2x);
+    const ex = x - Math.cos(ang) * rr, ey = y - Math.sin(ang) * rr;
+    return `<path d="M${x1} ${y1}C${c1x} ${c1y} ${c2x} ${c2y} ${ex} ${ey}" fill="none" stroke="${corr}" stroke-width="${largura}" ${tracejada ? 'stroke-dasharray="5 4"' : ''} marker-end="url(#m${corr.replace('#', '')})"/>`;
+  };
+  const marcadores = new Set();
+  const celRef = (x, y, id, corr, ativa, ptrNulo) => {
+    // caixinha da variável de referência
+    let r = `<rect x="${x}" y="${y - 11}" width="26" height="22" rx="3" fill="${C.card}" stroke="${ativa ? corr : C.noborda}" stroke-width="${ativa ? 2 : 1.2}"/>`;
+    if (id == null || !pos.has(id)) {
+      r += `<line x1="${x + 3}" y1="${y + 8}" x2="${x + 23}" y2="${y - 8}" stroke="${cor('--verm')}" stroke-width="1.6"/>`;
+      if (ativa && ptrNulo && stubs[ptrNulo[0] + ptrNulo[1]]) { marcadores.add(corr); setas += curva(x + 13, y, stubs[ptrNulo[0] + ptrNulo[1]], 4, corr, 1.6, true); }
+      return r;
+    }
+    marcadores.add(corr);
+    r += `<circle cx="${x + 13}" cy="${y}" r="3.2" fill="${corr}"/>`;
+    setas += curva(x + 13, y, pos.get(id), R + 2, corr, ativa ? 2.4 : 1.2, false);
+    return r;
+  };
+
+  // _raiz (atributo do objeto ArvoreBinaria)
+  const raizId = p.raiz === 'null' ? null : s.raiz;
+  const raizRecebe = p.atrib && p.atrib.raiz || p.ret && p.ret.para.raiz;
+  pilha += `<rect x="8" y="30" width="${SW - 8}" height="32" rx="5" fill="${raizRecebe ? C.verdecl : C.card}" stroke="${raizRecebe ? C.verde : C.line}"/>`;
+  pilha += T(16, 50, 'objeto ArvoreBinaria', `font-size="11.5" fill="${C.mute}"`);
+  pilha += T(SW - 52, 50, '_raiz', `${mono} font-size="12" text-anchor="end" fill="${C.ink}"`);
+  const raizCor = raizRecebe ? C.verde : C.navy;
+  pilha += celRef(SW - 44, 46, raizId, raizCor, true, null);
+
+  // registros de ativação (base em cima, topo embaixo)
+  p.pilha.forEach((f, n) => {
+    const topo = n === p.pilha.length - 1;
+    const y = g.pilhaY0 + n * (FH + FG);
+    pilha += `<rect x="8" y="${y}" width="${SW - 8}" height="${FH}" rx="5" fill="${topo ? C.larcl : C.card}" stroke="${topo ? C.lar : C.line}" stroke-width="${topo ? 1.8 : 1}"/>`;
+    pilha += T(16, y + 16, f.nome, `${mono} font-size="11.5" fill="${topo ? C.ink : C.mute}"`);
+    if (f.aguarda) pilha += T(SW - 8, y + 16, 'aguarda → ' + f.aguarda, `${mono} font-size="10.5" text-anchor="end" fill="${C.verde}" font-weight="600"`);
+    let x = 16;
+    for (const v of f.vars) {
+      pilha += T(x, y + 39, v[0], `${mono} font-size="12.5" fill="${C.ink}"`);
+      x += v[0].length * 8 + 6;
+      if (v.length === 3) {
+        const corr = v[0] === 'j' ? C.roxo : C.lar;
+        const ptrNulo = topo && p.ptr && p.ptr[v[0]] && p.ptr[v[0]].nulo;
+        pilha += celRef(x, y + 34, v[2], topo ? corr : C.noborda, topo, ptrNulo);
+        x += 40;
+      } else {
+        const w = Math.max(30, String(v[1]).length * 8 + 12);
+        pilha += `<rect x="${x}" y="${y + 23}" width="${w}" height="22" rx="3" fill="${C.card}" stroke="${C.noborda}"/>` + T(x + w / 2, y + 39, v[1], `${mono} font-size="12.5" text-anchor="middle" fill="${C.ink}"`);
+        x += w + 14;
+      }
+    }
+  });
+  if (!p.pilha.length) pilha += T(16, g.pilhaY0 + 22, 'nenhuma chamada em andamento', `font-size="12.5" fill="${C.mute}"`);
+
+  // retorno: quem recebe o resultado
+  if (p.ret) {
+    const para = p.ret.para;
+    let dx, dy;
+    if (para.raiz) { dx = SW - 31; dy = 46; }
+    else if (pos.has(para.no)) {
+      const q = pos.get(para.no), sx = para.lado === 'E' ? -1 : 1;
+      dx = q.x + sx * 33; dy = q.y + 30;
+      extra += `<rect x="${dx - 17}" y="${dy - 10}" width="34" height="20" rx="10" fill="${C.verdecl}" stroke="${C.verde}" stroke-width="1.6"/>` + T(dx, dy + 4.5, para.lado === 'E' ? 'Esq' : 'Dir', `${mono} font-size="11.5" text-anchor="middle" font-weight="700" fill="${C.verde}"`);
+    }
+    if (dx != null) {
+      marcadores.add(C.verde);
+      if (p.ret.de != null && pos.has(p.ret.de)) {
+        const q = pos.get(p.ret.de);
+        const mx = (q.x + dx) / 2 + (para.raiz ? 0 : 40), my = Math.min(q.y, dy) - 40;
+        extra += `<path d="M${q.x} ${q.y - R}Q${mx} ${my} ${dx} ${dy - 11}" fill="none" stroke="${C.verde}" stroke-width="2.6" stroke-dasharray="7 4" marker-end="url(#m${C.verde.replace('#', '')})"/>`;
+        extra += T(mx, my + 8, 'devolve n(' + s.nos[p.ret.de].v + ')', `${mono} font-size="11.5" text-anchor="middle" font-weight="700" fill="${C.verde}" paint-order="stroke" stroke="${C.card}" stroke-width="4"`);
+      } else {
+        extra += T(dx, dy - 16, 'recebe null', `${mono} font-size="11.5" text-anchor="middle" font-weight="700" fill="${C.verde}" paint-order="stroke" stroke="${C.card}" stroke-width="4"`);
+      }
+    }
+  }
+  if (p.atrib && !p.atrib.raiz && pos.has(p.atrib.no)) {
+    const q = pos.get(p.atrib.no), sx = p.atrib.lado === "E" ? -1 : 1, dx = q.x + sx * 33, dy = q.y + 30;
+    extra += `<rect x="${dx - 17}" y="${dy - 10}" width="34" height="20" rx="10" fill="${C.verde}"/>` + T(dx, dy + 4.5, p.atrib.lado === 'E' ? 'Esq' : 'Dir', `${mono} font-size="11.5" text-anchor="middle" font-weight="700" fill="#fff"`);
+  }
+
+  const mk = c => `<marker id="m${c.replace('#', '')}" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="${c}"/></marker>`;
+  [C.lar, C.roxo, C.verde, C.navy, C.noborda].forEach(c => marcadores.add(c));
+  svg.innerHTML = `<defs>${[...marcadores].map(mk).join('')}</defs><g font-family="Source Sans 3,sans-serif">${fundo}${arestas}${setas}${nos}${pilha}${extra}</g>`;
+  if (t >= 1) posAnt = alvo;
+}
+function animaPara(p) {
+  cancelAnimationFrame(anim);
+  const reduz = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (reduz || posAnt.size === 0) { desenha(p, 1); return; }
+  const t0 = performance.now(), dur = 320;
+  const f = now => { const t = Math.min(1, (now - t0) / dur); desenha(p, t < 1 ? 1 - (1 - t) ** 3 : 1); if (t < 1) anim = requestAnimationFrame(f); };
+  anim = requestAnimationFrame(f);
+}
+
+/* ---------------- painel ---------------- */
+function mostra() {
+  const p = passos[k];
+  if (!p) return;
+  mostraCodigo(p.cod, p.linha, p.erro);
+  animaPara(p);
+  $('nota').innerHTML = p.nota;
+  $('nota').className = 'nota' + (p.erro ? ' err' : '');
+  $('tela').textContent = p.tela == null ? '' : p.tela;
+  $('res').innerHTML = p.resultado !== undefined && k === passos.length - 1 ? `Resultado: <b>${esc(p.resultado)}</b>` : '';
+  $('pBar').max = passos.length - 1; $('pBar').value = k;
+  $('pCont').textContent = `${k + 1}/${passos.length}`;
+  const nn = Object.keys(p.snap.nos).length;
+  $('info').textContent = `${nn} nó${nn === 1 ? '' : 's'}`;
+  $('pAnt').disabled = $('pIni').disabled = k === 0;
+  $('pPro').disabled = $('pFim').disabled = k === passos.length - 1;
+  rotulo();
+}
+const manual = () => $('modo').value === 'manual';
+function rotulo() { $('pPlay').textContent = manual() ? '▶ Executar passo' : timer ? '⏸ Pausar' : '▶ Executar'; $('pPlay').disabled = manual() && k >= passos.length - 1; $('vel').disabled = manual(); }
+function para() { clearInterval(timer); timer = null; rotulo(); }
+function toca() {
+  if (k >= passos.length - 1) k = 0;
+  timer = setInterval(() => { if (k < passos.length - 1) { k++; mostra(); } else para(); }, +$('vel').value);
+  rotulo();
+}
+function carrega(ps, rotulo, erro) {
+  para(); passos = ps; k = $('passo').checked ? 0 : ps.length - 1; mostra();
+  if (rotulo) log(rotulo, erro);
+  if ($('passo').checked && ps.length > 1 && !manual()) toca();
+}
+function log(t, e) { const s = document.createElement('span'); s.textContent = t; if (e) s.className = 'e'; $('log').prepend(s); while ($('log').children.length > 14) $('log').lastChild.remove(); }
+function estado(nota) {
+  const p = { cod: codAtual || 'ins', linha: -1, nota, ptr: {}, snap: m.snap(), marca: {}, aresta: {}, pend: [], pilha: [], tela: null, raiz: m.raiz == null ? 'null' : `n(${m.nos.get(m.raiz).v})` };
+  para(); passos = [p]; k = 0; mostra();
+}
+function valores() {
+  const v = $('val').value.trim().split(/[\s,;]+/).filter(Boolean).map(Number);
+  if (!v.length || v.some(x => !Number.isInteger(x) || Math.abs(x) > 999)) { estado('Digite números <b>inteiros</b> entre −999 e 999.'); return null; }
+  return v;
+}
+
+/* ---------------- operações ---------------- */
+function op(tipo) {
+  if (['pre', 'cen', 'pos'].includes(tipo)) { carrega(traceCaminhar(m, tipo), { pre: 'Pré-ordem', cen: 'Em-ordem', pos: 'Pós-ordem' }[tipo]); return; }
+  if (tipo === 'min' || tipo === 'max') { const ps = traceExtremo(m, tipo); carrega(ps, (tipo === 'min' ? 'Minimo()' : 'Maximo()') + (ps.at(-1).erro ? ' ✗' : ' = ' + ps.at(-1).resultado), ps.at(-1).erro); return; }
+  const v = valores(); if (!v) return;
+  if (v.length > 1) {
+    if (tipo !== 'ins') { estado('Pesquisa e remoção são feitas com <b>um</b> valor por vez.'); return; }
+    const ok = [], rep = [];
+    for (const x of v) { try { m.inserir(x); ok.push(x); } catch { rep.push(x); } }
+    estado(`Inseridos de uma vez: <b>${ok.join(', ') || 'nenhum'}</b>` + (rep.length ? `. Já existiam (ignorados): ${rep.join(', ')}` : '') + '.');
+    log('Inserir ' + ok.join(' '), false); return;
+  }
+  const x = v[0];
+  const ps = tipo === 'ins' ? traceInserir(m, x) : tipo === 'pes' ? tracePesquisar(m, x) : traceRemover(m, x);
+  const fim = ps.at(-1);
+  const nome = { ins: 'Inserir', pes: 'Pesquisar', rem: 'Remover' }[tipo];
+  carrega(ps, `${nome}(${x})` + (fim.erro ? ' ✗' : tipo === 'pes' ? ' = ' + fim.resultado : ''), fim.erro);
+}
+function exemplo(seq, nome) { m.nos.clear(); m.raiz = null; m.prox = 1; posAnt = new Map(); for (const x of seq) m.inserir(x); estado(nome); log('Nova árvore', false); }
+
+$('bIns').onclick = () => op('ins'); $('bPes').onclick = () => op('pes'); $('bRem').onclick = () => op('rem');
+$('bPre').onclick = () => op('pre'); $('bCen').onclick = () => op('cen'); $('bPos').onclick = () => op('pos');
+$('bMin').onclick = () => op('min'); $('bMax').onclick = () => op('max');
+$('bEx').onclick = () => exemplo([50, 30, 70, 20, 40, 60, 80, 35, 45, 65], 'Árvore de exemplo da apostila: 50, 30, 70, 20, 40, 60, 80, 35, 45 e 65.');
+$('bAle').onclick = () => { const s = new Set(); while (s.size < 10) s.add(1 + Math.floor(Math.random() * 99)); const a = [...s]; exemplo(a, 'Árvore aleatória: inseridos ' + a.join(', ') + '.'); };
+$('bLim').onclick = () => exemplo([], 'Árvore vazia. Insira um valor para começar.');
+$('val').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); op('ins'); } });
+$('pPlay').onclick = () => { if (manual()) { if (k < passos.length - 1) { k++; mostra(); } } else timer ? para() : toca(); };
+$('modo').onchange = () => { para(); try { localStorage.setItem('abpModo', $('modo').value); } catch {} };
+try { const mm = localStorage.getItem('abpModo'); if (mm === 'manual' || mm === 'auto') $('modo').value = mm; } catch {}
+$('pAnt').onclick = () => { para(); if (k > 0) { k--; mostra(); } };
+$('pPro').onclick = () => { para(); if (k < passos.length - 1) { k++; mostra(); } };
+$('pIni').onclick = () => { para(); k = 0; mostra(); };
+$('pFim').onclick = () => { para(); k = passos.length - 1; mostra(); };
+$('pBar').oninput = e => { para(); k = +e.target.value; mostra(); };
+$('vel').onchange = () => { if (timer) { para(); toca(); } };
+$('nulos').onchange = () => desenha(passos[k], 1);
+document.addEventListener('keydown', e => {
+  if (e.target.tagName === 'INPUT' && e.target.type === 'text') return;
+  if (e.key === 'ArrowRight') { e.preventDefault(); $('pPro').click(); }
+  else if (e.key === 'ArrowLeft') { e.preventDefault(); $('pAnt').click(); }
+  else if (e.key === ' ' && e.target.tagName !== 'BUTTON') { e.preventDefault(); $('pPlay').click(); }
+});
+new ResizeObserver(() => passos[k] && desenha(passos[k], 1)).observe($('svg'));
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => passos[k] && desenha(passos[k], 1));
+new MutationObserver(() => passos[k] && desenha(passos[k], 1)).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+
+// classe completa
+$('full').innerHTML = FONTE.split('\n').map((l, n) => `<div><span class="n">${n + 1}</span>${colore(l)}</div>`).join('');
+$('bCopia').onclick = async () => { try { await navigator.clipboard.writeText(FONTE); $('copiado').textContent = 'Copiado.'; } catch { $('copiado').textContent = 'Não foi possível copiar; selecione o texto abaixo.'; } };
+
+// começa no meio do uso: árvore de exemplo e a inserção do 62 pronta para executar
+for (const x of [50, 30, 70, 20, 40, 60, 80, 35, 45, 65]) m.inserir(x);
+passos = traceInserir(m, 62); k = 0; mostra(); log('Inserir(62)', false);
+}
+
+</script>
+</body>
+</html>
