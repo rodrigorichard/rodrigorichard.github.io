@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Simuladores de AED</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+:root{color-scheme:light dark;
+ --bg:light-dark(#f6f7f9,#0e1522);--card:light-dark(#fff,#16202f);--ink:light-dark(#18202b,#e6ebf2);--mute:light-dark(#5b6573,#9aa6b6);
+ --navy:#0b2d5b;--navyink:light-dark(#0b2d5b,#a9c3e8);--gold:#c9a227;--line:light-dark(#d9dfe8,#2a3647);
+ --no:light-dark(#e8eef7,#1d2c44);--noborda:light-dark(#0b2d5b,#7fa3d6);--lar:#d9822b;--larcl:light-dark(#fcebd9,#3a2a16)}
+*{box-sizing:border-box;min-width:0}
+body{margin:0;background:var(--bg);color:var(--ink);font:17px/1.55 "Source Sans 3",system-ui,sans-serif}
+header{background:var(--navy);color:#fff;border-bottom:4px solid var(--gold);padding:28px max(5vw,18px)}
+header h1{margin:0;font-size:clamp(28px,4vw,40px);line-height:1.1}
+header p{margin:8px 0 0;color:#c8d6ea;max-width:62ch}
+main{max-width:1100px;margin:auto;padding:28px max(5vw,18px) 48px}
+h2{font-size:20px;color:var(--navyink);margin:0 0 14px}
+.grade{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,320px),1fr));gap:18px}
+a.card{display:flex;flex-direction:column;background:var(--card);border:1px solid var(--line);border-radius:12px;overflow:hidden;
+ color:inherit;text-decoration:none;transition:transform .15s,box-shadow .15s,border-color .15s}
+a.card:hover{transform:translateY(-3px);box-shadow:0 10px 24px rgba(11,45,91,.14);border-color:var(--navyink)}
+a.card:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
+.fig{background:light-dark(#f3f5f8,#101826);border-bottom:1px solid var(--line);padding:14px;display:grid;place-items:center}
+.fig svg{width:100%;max-width:280px;height:auto}
+.txt{padding:14px 16px 18px;display:flex;flex-direction:column;gap:6px;flex:1}
+.txt h3{margin:0;font-size:20px;color:var(--navyink)}
+.txt p{margin:0;color:var(--mute);font-size:16px}
+.tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.tags span{font-size:13px;padding:2px 9px;border-radius:12px;background:var(--no);color:var(--navyink)}
+.abrir{margin-top:auto;padding-top:10px;font-weight:700;color:var(--navyink)}
+footer{max-width:1100px;margin:auto;padding:0 max(5vw,18px) 32px;color:var(--mute);font-size:15px}
+@media(prefers-reduced-motion:reduce){a.card{transition:none}a.card:hover{transform:none}}
+</style>
+</head>
+<body>
+<header>
+  <h1>Simuladores de Algoritmos e Estruturas de Dados</h1>
+  <p>PUC Minas · Prof. Rodrigo Richard Gomes. Escolha um simulador para acompanhar, passo a passo, o código C# visto em aula.</p>
+</header>
+<main>
+  <h2>Simuladores disponíveis</h2>
+  <div class="grade" id="grade"></div>
+</main>
+<footer>Algoritmos e Estruturas de Dados · PUC Minas</footer>
+<script>
+{
+// Para acrescentar um simulador, copie um item desta lista e ajuste os campos.
+// "arquivo" é o caminho do .html em relação a este main.html.
+const SIMULADORES = [
+  {
+    titulo: 'Árvore Binária de Pesquisa',
+    descricao: 'Inserção, pesquisa, remoção, caminhamentos, mínimo e máximo, com o código da classe ArvoreBinaria, a pilha de execução e as referências desenhadas.',
+    arquivo: 'simulador-abp.html',
+    tags: ['Unidade VII', 'C#', 'recursão'],
+    figura: 'abp'
+  }
+];
+
+const FIGURAS = {
+  abp: `<svg viewBox="0 0 280 150" role="img" aria-label="Desenho de uma árvore binária de pesquisa">
+    <g stroke="var(--noborda)" stroke-width="2">
+      <line x1="140" y1="28" x2="80" y2="72"/><line x1="140" y1="28" x2="200" y2="72"/>
+      <line x1="80" y1="72" x2="50" y2="118"/><line x1="80" y1="72" x2="110" y2="118"/>
+      <line x1="200" y1="72" x2="170" y2="118"/>
+    </g>
+    <line x1="200" y1="72" x2="230" y2="118" stroke="var(--lar)" stroke-width="3.5"/>
+    <line x1="140" y1="28" x2="200" y2="72" stroke="var(--lar)" stroke-width="3.5"/>
+    <g font-family="Source Sans 3,sans-serif" font-weight="700" font-size="14" text-anchor="middle">
+      ${[[140,28,50,'c'],[80,72,30],[200,72,70,'c'],[50,118,20],[110,118,40],[170,118,60],[230,118,80,'n']].map(([x,y,v,e]) =>
+        `<circle cx="${x}" cy="${y}" r="17" fill="${e==='n'?'var(--lar)':e==='c'?'var(--larcl)':'var(--no)'}" stroke="${e?'var(--lar)':'var(--noborda)'}" stroke-width="2.2"/>
+         <text x="${x}" y="${y+5}" fill="${e==='n'?'#fff':'var(--ink)'}">${v}</text>`).join('')}
+    </g>
+  </svg>`
+};
+
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+document.getElementById('grade').innerHTML = SIMULADORES.map(s => `
+  <a class="card" href="${esc(s.arquivo)}">
+    <div class="fig">${FIGURAS[s.figura] || ''}</div>
+    <div class="txt">
+      <h3>${esc(s.titulo)}</h3>
+      <p>${esc(s.descricao)}</p>
+      <div class="tags">${s.tags.map(t => `<span>${esc(t)}</span>`).join('')}</div>
+      <span class="abrir">Abrir simulador →</span>
+    </div>
+  </a>`).join('');
+}
+</script>
+</body>
+</html>
