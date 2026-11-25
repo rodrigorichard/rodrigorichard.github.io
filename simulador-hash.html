@@ -1,0 +1,1347 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Simulador de Tabela Hash</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+/* VOICE: material de aula da PUC Minas — sóbrio, claro, feito para projetar e para o aluno mexer sozinho.
+   IDEA: as figuras dos slides da Unidade VII (tabela em coluna, "livre"/"ocupado" ao lado da posição) ganhando vida, com o código e o contador de comparações.
+   PICTURE: a coluna da tabela com a sonda apontando a posição examinada; na lista encadeada, as células ligadas por setas.
+   COLOUR and TYPE: azul-marinho e dourado do template das aulas; laranja só para o que está acontecendo agora.
+   LAYOUT: barra de operações, depois código à esquerda e árvore + memória à direita; abaixo, o player e a classe completa. */
+:root{color-scheme:light dark;
+ --bg:light-dark(#f6f7f9,#0e1522);--card:light-dark(#fff,#16202f);--ink:light-dark(#18202b,#e6ebf2);--mute:light-dark(#5b6573,#9aa6b6);
+ --navy:#0b2d5b;--navyink:light-dark(#0b2d5b,#a9c3e8);--gold:#c9a227;--line:light-dark(#d9dfe8,#2a3647);
+ --no:light-dark(#e8eef7,#1d2c44);--noborda:light-dark(#0b2d5b,#7fa3d6);
+ --lar:#d9822b;--larcl:light-dark(#fcebd9,#3a2a16);--verde:#2e7d4f;--verdecl:light-dark(#dff2e6,#173323);
+ --verm:#b3261e;--vermcl:light-dark(#fcedec,#3b1a18);--roxo:#6b3fa0;--roxocl:light-dark(#eee6f7,#2a1f3a);
+ --codebg:light-dark(#f3f5f8,#101826)}
+:root[data-theme=light]{color-scheme:light}:root[data-theme=dark]{color-scheme:dark}
+*{box-sizing:border-box;min-width:0}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 "Source Sans 3",system-ui,sans-serif;overflow-x:clip}
+header{background:var(--navy);color:#fff;border-bottom:4px solid var(--gold);padding:14px max(3vw,14px)}
+header h1{margin:0;font-size:clamp(22px,3vw,30px);line-height:1.1}
+header p{margin:4px 0 0;color:#c8d6ea;font-size:15px}
+main{padding:14px max(3vw,14px) 40px;max-width:1500px;margin:auto}
+.ops{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+.grp{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.grp+.grp{border-left:1px solid var(--line);padding-left:14px}
+label.lb{font-size:14px;color:var(--mute)}
+input[type=text]{font:16px "JetBrains Mono",monospace;width:9.5em;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink)}
+button,select{font:600 15px "Source Sans 3",sans-serif;min-height:40px;padding:6px 12px;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer}
+button:hover{border-color:var(--navyink)}
+button.pri{background:var(--navy);color:#fff;border-color:var(--navy)}
+button.pri:hover{background:#123f7d}
+button:focus-visible,select:focus-visible,input:focus-visible{outline:3px solid var(--gold);outline-offset:1px}
+button:disabled{opacity:.45;cursor:default}
+.palco{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,3fr);gap:14px;margin-top:14px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.tit{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--line);font-weight:700;color:var(--navyink);font-size:15px}
+.tit small{font-weight:400;color:var(--mute)}
+pre.cod{position:relative;margin:0;padding:8px 0;background:var(--codebg);font:13px/1.62 "JetBrains Mono",monospace;overflow:auto;max-height:560px}
+pre.cod div{padding:0 12px 0 10px;border-left:4px solid transparent;white-space:pre}
+pre.cod div.at{background:var(--larcl);border-left-color:var(--lar)}
+pre.cod div.at.err{background:var(--vermcl);border-left-color:var(--verm)}
+pre.cod .n{display:inline-block;width:2.2em;color:var(--mute);opacity:.6;user-select:none}
+.kw{color:light-dark(#0b2d5b,#8fb5ec);font-weight:600}.cm{color:var(--verde);font-style:italic}.st{color:light-dark(#9a5a12,#e0a45a)}
+.fig{position:relative;height:420px;background:var(--card)}
+.fig svg{position:absolute;inset:0;width:100%;height:100%}
+.nota{margin:10px 12px;padding:9px 12px;border-radius:8px;background:var(--larcl);border-left:4px solid var(--lar);min-height:44px}
+.nota.err{background:var(--vermcl);border-left-color:var(--verm)}
+.nota code,.tela code{font:13.5px "JetBrains Mono",monospace}
+.baixo{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:0;border-top:1px solid var(--line)}
+.mem{padding:8px 12px;font:13px "JetBrains Mono",monospace}
+.mem h3,.telab h3{margin:0 0 6px;font:700 13px "Source Sans 3",sans-serif;color:var(--mute)}
+.fr{display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:4px 6px;margin-top:4px;border:1px solid var(--line);border-radius:6px}
+.fr.top{border-color:var(--lar);background:var(--larcl)}
+.fr .nm{flex:1 1 8.5em;color:var(--mute)}
+.cel{border:1px solid var(--noborda);background:var(--card);padding:0 6px;border-radius:3px}
+.cel i{font-style:normal;color:var(--mute)}
+.telab{padding:4px 12px 12px}
+.tela{background:#111b27;color:#7ee2a0;font:15px "JetBrains Mono",monospace;padding:8px 10px;border-radius:6px;min-height:40px;overflow-wrap:anywhere}
+.res{margin-top:8px;font-size:15px}
+.player{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px;position:sticky;top:0;z-index:5;box-shadow:0 4px 14px rgba(11,45,91,.12);background:var(--card);border:1px solid var(--line);border-radius:10px;padding:8px 12px}
+.player input[type=range]{flex:1 1 200px;accent-color:var(--navy);min-height:40px}
+.cont{font:14px "JetBrains Mono",monospace;color:var(--mute);white-space:nowrap}
+.chk{display:flex;gap:6px;align-items:center;font-size:15px}
+.chk input{width:18px;height:18px;accent-color:var(--navy)}
+.log{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;font:13px "JetBrains Mono",monospace}
+.log span{padding:2px 8px;border-radius:12px;background:var(--no);color:var(--navyink)}
+.log span.e{background:var(--vermcl);color:var(--verm)}
+details{margin-top:16px;background:var(--card);border:1px solid var(--line);border-radius:10px}
+summary{cursor:pointer;padding:12px;font-weight:700;color:var(--navyink)}
+details pre{margin:0;max-height:none;border-top:1px solid var(--line)}
+.leg{display:flex;flex-wrap:wrap;gap:12px;font-size:14px;color:var(--mute);margin-top:10px}
+.leg b{display:inline-block;width:14px;height:14px;border-radius:50%;vertical-align:-2px;margin-right:4px;border:2px solid}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.seg button{border:0;border-radius:0;min-width:58px}
+.seg button+button{border-left:1px solid var(--line)}
+.seg button[aria-pressed=true]{background:var(--navy);color:#fff}
+.caso{max-width:100%}
+.pilha{display:flex;flex-direction:column;gap:6px;padding:10px 12px 0}
+.fr{border:1px solid var(--line);border-radius:6px;padding:4px 8px;font:13px "JetBrains Mono",monospace;display:flex;flex-wrap:wrap;gap:4px 10px;align-items:center}
+.fr.top{border-color:var(--lar);background:var(--larcl)}
+.fr .nm{color:var(--mute);margin-right:4px}.fr.top .nm{color:var(--ink);font-weight:600}
+.fr .vv{border:1px solid var(--noborda);border-radius:3px;padding:0 6px;background:var(--card)}
+.fr .ag{margin-left:auto;color:var(--verde);font-weight:600;font-size:12px}
+.stats{display:flex;flex-wrap:wrap;gap:6px 18px;padding:8px 12px 0;font-size:15px;color:var(--mute)}
+.stats b{color:var(--ink);font-family:"JetBrains Mono",monospace}
+.stats .cmp b{color:var(--lar);font-size:18px}
+.rot{margin:10px 12px 0;padding:9px 12px;border-radius:8px;background:var(--roxocl);border-left:5px solid var(--roxo)}
+.rot h3{margin:0;font-size:17px;color:var(--roxo);display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center}
+.rot .et{font:600 13px "Source Sans 3",sans-serif;background:var(--roxo);color:#fff;border-radius:12px;padding:1px 10px}
+.rot p{margin:4px 0 0;font-size:15px}
+.rot code{font:13.5px "JetBrains Mono",monospace}
+.tela{display:none}
+.res{margin:0 12px 10px;font-size:15px}
+@media(max-width:900px){.palco{grid-template-columns:minmax(0,1fr)}.cardcod{order:2}pre.cod{max-height:340px}}
+@media(max-width:600px){.grp+.grp{border-left:0;padding-left:0}pre.cod{font-size:12.5px}}
+@media(max-width:600px){.player{position:static}}
+@media(prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<header>
+  <h1>Simulador de Tabela Hash</h1>
+  <p>Algoritmos e Estruturas de Dados · PUC Minas · área de reserva, rehash e lista encadeada, linha a linha, em C# ou Java · <a href="index.html" style="color:#fff">todos os simuladores</a></p>
+</header>
+<main>
+  <div class="ops" role="group" aria-label="Configuração e operações">
+    <div class="grp">
+      <label class="lb" for="tec">Técnica</label>
+      <select id="tec">
+        <option value="reserva">Hash direta com área de reserva</option>
+        <option value="rehash">Hash direta com rehash</option>
+        <option value="lista">Hash indireta com lista encadeada</option>
+      </select>
+    </div>
+    <div class="grp">
+      <span class="lb">Linguagem</span>
+      <div class="seg" id="langs" role="group" aria-label="Linguagem do código">
+        <button data-l="cs" aria-pressed="true">C#</button><button data-l="java" aria-pressed="false">Java</button>
+      </div>
+    </div>
+    <div class="grp">
+      <label class="lb" for="tam">Tamanho (m)</label>
+      <select id="tam"><option>5</option><option selected>7</option><option>11</option><option>13</option></select>
+      <span id="grpRes" style="display:contents">
+        <label class="lb" for="resv">Área de reserva</label>
+        <select id="resv"><option>1</option><option>2</option><option selected>3</option><option>4</option><option>5</option></select>
+      </span>
+    </div>
+    <div class="grp">
+      <label class="lb" for="val">Valor(es)</label>
+      <input type="text" id="val" value="21" inputmode="numeric" autocomplete="off" aria-describedby="dicaval">
+      <button class="pri" id="bIns">Inserir</button>
+      <button class="pri" id="bPes">Pesquisar</button>
+      <button class="pri" id="bRem">Remover</button>
+    </div>
+    <div class="grp">
+      <button id="bEx">Exemplo dos slides</button>
+      <button id="bAle">Aleatória</button>
+      <button id="bLim">Esvaziar</button>
+    </div>
+  </div>
+  <p id="dicaval" class="leg" style="margin:6px 2px 0;display:block">Chaves inteiras de 0 a 999. Vários valores separados por espaço ou vírgula (ex.: 5 7 14) são inseridos um depois do outro, com passo a passo. Função de transformação: <code>h(x) = x % m</code>.</p>
+
+  <div class="player" role="group" aria-label="Controle dos passos">
+    <button id="pIni" title="Primeiro passo" aria-label="Primeiro passo">⏮</button>
+    <button id="pAnt" title="Passo anterior (←)" aria-label="Passo anterior">◀</button>
+    <button id="pPlay" class="pri" title="Executar / pausar (espaço)" aria-label="Executar ou pausar" style="min-width:150px">▶ Executar</button>
+    <button id="pPro" title="Próximo passo (→)" aria-label="Próximo passo">▶|</button>
+    <button id="pFim" title="Último passo" aria-label="Último passo">⏭</button>
+    <input type="range" id="pBar" min="0" max="0" value="0" aria-label="Passo">
+    <span class="cont" id="pCont">0/0</span>
+    <select id="modo" aria-label="Modo de execução">
+      <option value="auto">Execução automática</option><option value="manual">Um passo por clique</option>
+    </select>
+    <select id="vel" aria-label="Velocidade">
+      <option value="1600">0,5×</option><option value="900" selected>1×</option><option value="450">2×</option><option value="200">4×</option>
+    </select>
+    <label class="chk"><input type="checkbox" id="passo" checked> passo a passo</label>
+  </div>
+
+  <div class="palco">
+    <section class="card cardcod" aria-label="Código em execução">
+      <div class="tit"><span id="codTit">Código</span><small id="codLang"></small></div>
+      <pre class="cod" id="cod"></pre>
+    </section>
+    <section class="card" aria-label="Tabela e memória">
+      <div class="tit"><span id="figTit">Tabela</span><small id="info2"></small></div>
+      <div class="stats" id="stats"></div>
+      <div class="pilha" id="pilha" aria-label="Chamadas em andamento"></div>
+      <div class="fig"><svg id="svg" role="img" aria-label="Tabela hash"></svg></div>
+      <div class="nota" id="nota" aria-live="polite"></div>
+      <div class="res" id="res"></div>
+    </section>
+  </div>
+
+  <div class="leg" id="legenda">
+    <span><b style="background:var(--larcl);border-color:var(--lar)"></b>posição examinada</span>
+    <span><b style="background:var(--lar);border-color:var(--lar)"></b>valor gravado agora</span>
+    <span><b style="background:var(--verde);border-color:var(--verde)"></b>encontrado</span>
+    <span><b style="background:var(--vermcl);border-color:var(--verm)"></b>posição esvaziada / célula a remover</span>
+  </div>
+  <div class="log" id="log" aria-label="Histórico de operações"></div>
+
+  <details>
+    <summary id="fullTit">Código completo</summary>
+    <div style="padding:0 12px 10px;display:flex;gap:10px;align-items:center"><button id="bCopia">Copiar código</button><span id="copiado" class="leg" style="margin:0"></span></div>
+    <pre class="cod" id="full"></pre>
+  </details>
+</main>
+<footer style="padding:0 max(3vw,14px) 30px;color:var(--mute);font-size:14px;max-width:1500px;margin:auto">Algoritmos e Estruturas de Dados · PUC Minas · Prof. Rodrigo Richard Gomes · o código em C# e em Java foi compilado e testado</footer>
+<script>
+/* Se algo der errado, mostra a mensagem real na página (em vez de só "Script error") */
+window.addEventListener('error', ev => {
+  try {
+    const n = document.getElementById('nota');
+    const msg = (ev.error && ev.error.stack) || ev.message || 'erro desconhecido';
+    if (n) { n.className = 'nota err'; n.innerHTML = '<b>Erro no simulador.</b> Copie esta mensagem e envie ao professor:<br><code style="white-space:pre-wrap">' +
+      String(msg).replace(/[&<>]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[ch])) + ' (linha ' + (ev.lineno || '?') + ')</code>'; }
+  } catch (e) {}
+});
+
+/* Código das técnicas de hash (C# e Java). Cada linha pode terminar com ⟨id⟩,
+   o marcador que liga um passo do simulador à linha (retirado na exibição). */
+const SRC = {
+cs: {
+/* ------------------------------------------------------------------ área de reserva */
+reserva: `public class HashReserva
+{
+    private const int NULO = -1;            // marca de posição vazia
+    private int[] _tabela;
+    private int _tamTabela, _tamReserva, _numReserva;
+
+    public HashReserva(int tamTabela, int tamReserva)
+    {
+        _tamTabela = tamTabela;
+        _tamReserva = tamReserva;
+        _numReserva = 0;
+        _tabela = new int[tamTabela + tamReserva];
+        for (int i = 0; i < _tabela.Length; i++)
+            _tabela[i] = NULO;
+    }
+
+    private int Hash(int x)
+    {
+        return x % _tamTabela;
+    }
+
+    public void Inserir(int x) ⟨ins.sig⟩
+    {
+        int i = Hash(x); ⟨ins.i⟩
+        if (x == NULO) ⟨ins.nulo⟩
+            throw new ArgumentException("Erro: valor inválido!");
+        else if (_tabela[i] == NULO) ⟨ins.livre⟩
+            _tabela[i] = x; ⟨ins.put⟩
+        else if (_numReserva < _tamReserva) ⟨ins.res⟩
+        {
+            _tabela[_tamTabela + _numReserva] = x; ⟨ins.putR⟩
+            _numReserva++;      // o valor inicial de _numReserva é zero ⟨ins.inc⟩
+        }
+        else
+            throw new InvalidOperationException("Erro: área de reserva cheia!"); ⟨ins.err⟩
+    } ⟨ins.fim⟩
+
+    public int Pesquisar(int x) ⟨pes.sig⟩
+    {
+        int i = Hash(x), resp = NULO; ⟨pes.i⟩
+        if (_tabela[i] == x) ⟨pes.eq⟩
+            resp = i; ⟨pes.resp⟩
+        else if (_tabela[i] != NULO) ⟨pes.nn⟩
+        {
+            for (int k = 0; k < _numReserva; k++) ⟨pes.for⟩
+            {
+                if (_tabela[_tamTabela + k] == x) ⟨pes.eqR⟩
+                {
+                    resp = _tamTabela + k; ⟨pes.respR⟩
+                    break; ⟨pes.break⟩
+                }
+            }
+        }
+        return resp; ⟨pes.ret⟩
+    }
+
+    public void Remover(int x) ⟨rem.sig⟩
+    {
+        int i = Pesquisar(x); ⟨rem.call⟩
+        if (i == NULO) ⟨rem.nf⟩
+            throw new InvalidOperationException($"Erro: {x} não encontrado!"); ⟨rem.err⟩
+        if (i < _tamTabela)                 // x está na tabela principal ⟨rem.princ⟩
+        {
+            _tabela[i] = NULO; ⟨rem.nulo⟩
+            // se um elemento da reserva tem o mesmo hash, ele sobe para a vaga
+            for (int k = _tamTabela; k < _tamTabela + _numReserva; k++) ⟨rem.for⟩
+            {
+                if (Hash(_tabela[k]) == i) ⟨rem.h⟩
+                {
+                    _tabela[i] = _tabela[k]; ⟨rem.sobe⟩
+                    i = k;                  // agora a vaga a fechar é a k ⟨rem.ik⟩
+                    break; ⟨rem.break⟩
+                }
+            }
+        }
+        if (i >= _tamTabela)                // fecha o buraco na reserva ⟨rem.res⟩
+        {
+            for (int k = i; k < _tamTabela + _numReserva - 1; k++) ⟨rem.for2⟩
+                _tabela[k] = _tabela[k + 1]; ⟨rem.desloca⟩
+            _numReserva--; ⟨rem.dec⟩
+            _tabela[_tamTabela + _numReserva] = NULO; ⟨rem.limpa⟩
+        }
+    } ⟨rem.fim⟩
+}`,
+/* ------------------------------------------------------------------ rehash */
+rehash: `public class HashRehash
+{
+    private const int NULO = -1;            // posição que nunca foi usada
+    private const int REMOVIDO = -2;        // posição cujo elemento foi removido
+    private int[] _tabela;
+    private int _tamTabela;
+
+    public HashRehash(int tamTabela)
+    {
+        _tamTabela = tamTabela;
+        _tabela = new int[tamTabela];
+        for (int i = 0; i < tamTabela; i++)
+            _tabela[i] = NULO;
+    }
+
+    private int Hash(int x)
+    {
+        return x % _tamTabela;
+    }
+
+    private int Rehash(int x)
+    {
+        return ++x % _tamTabela;
+    }
+
+    public void Inserir(int x) ⟨ins.sig⟩
+    {
+        int i = Hash(x); ⟨ins.i⟩
+        if (x == NULO || x == REMOVIDO) ⟨ins.nulo⟩
+            throw new ArgumentException("Erro: valor inválido!");
+        else if (_tabela[i] == NULO || _tabela[i] == REMOVIDO) ⟨ins.livre⟩
+            _tabela[i] = x; ⟨ins.put⟩
+        else
+        {
+            i = Rehash(x); ⟨ins.re⟩
+            if (_tabela[i] == NULO || _tabela[i] == REMOVIDO) ⟨ins.livre2⟩
+                _tabela[i] = x; ⟨ins.put2⟩
+            else
+                throw new InvalidOperationException($"Erro: não é possível inserir o {x}!"); ⟨ins.err⟩
+        }
+    } ⟨ins.fim⟩
+
+    public int Pesquisar(int x) ⟨pes.sig⟩
+    {
+        int i = Hash(x), resp = NULO; ⟨pes.i⟩
+        if (_tabela[i] == x) ⟨pes.eq⟩
+            resp = i; ⟨pes.resp⟩
+        else if (_tabela[i] != NULO) ⟨pes.nn⟩
+        {
+            i = Rehash(x); ⟨pes.re⟩
+            if (_tabela[i] == x) ⟨pes.eq2⟩
+                resp = i; ⟨pes.resp2⟩
+        }
+        return resp; ⟨pes.ret⟩
+    }
+
+    public void Remover(int x) ⟨rem.sig⟩
+    {
+        int i = Pesquisar(x); ⟨rem.call⟩
+        if (i == NULO) ⟨rem.nf⟩
+            throw new InvalidOperationException($"Erro: {x} não encontrado!"); ⟨rem.err⟩
+        // não pode voltar a NULO: a pesquisa de um elemento que foi
+        // para o rehash pararia nesta posição e não o encontraria
+        _tabela[i] = REMOVIDO; ⟨rem.marca⟩
+    } ⟨rem.fim⟩
+}`,
+/* ------------------------------------------------------------------ lista encadeada */
+lista: `public class HashLista
+{
+    private Lista[] _tabela;
+    private int _tamTabela;
+
+    public HashLista(int tamTabela)
+    {
+        _tamTabela = tamTabela;
+        _tabela = new Lista[tamTabela];
+        for (int i = 0; i < tamTabela; i++)
+            _tabela[i] = new Lista();
+    }
+
+    private int Hash(int x)
+    {
+        return x % _tamTabela;
+    }
+
+    public void Inserir(int x) ⟨ins.sig⟩
+    {
+        if (Pesquisar(x)) ⟨ins.pes⟩
+            throw new InvalidOperationException($"Erro: {x} já existe!"); ⟨ins.err⟩
+        else
+            _tabela[Hash(x)].Inserir(x); ⟨ins.put⟩
+    } ⟨ins.fim⟩
+
+    public bool Pesquisar(int x) ⟨pes.sig⟩
+    {
+        return _tabela[Hash(x)].Pesquisar(x); ⟨pes.call⟩
+    }
+
+    public void Remover(int x) ⟨rem.sig⟩
+    {
+        _tabela[Hash(x)].Remover(x); ⟨rem.call⟩
+    } ⟨rem.fim⟩
+}
+
+public class Celula
+{
+    public int Elemento { get; set; }
+    public Celula? Prox { get; set; }
+
+    public Celula(int elemento)
+    {
+        Elemento = elemento;
+        Prox = null;
+    }
+}
+
+public class Lista
+{
+    private Celula _primeiro, _ultimo;      // _primeiro é a célula cabeça
+
+    public Lista()
+    {
+        _primeiro = new Celula(-1);
+        _ultimo = _primeiro;
+    }
+
+    public void Inserir(int x)              // insere no fim ⟨lins.sig⟩
+    {
+        _ultimo.Prox = new Celula(x); ⟨lins.a⟩
+        _ultimo = _ultimo.Prox; ⟨lins.b⟩
+    } ⟨lins.fim⟩
+
+    public bool Pesquisar(int x) ⟨lpes.sig⟩
+    {
+        for (Celula? i = _primeiro.Prox; i != null; i = i.Prox) ⟨lpes.for⟩
+            if (i.Elemento == x) ⟨lpes.eq⟩
+                return true; ⟨lpes.t⟩
+        return false; ⟨lpes.f⟩
+    }
+
+    public void Remover(int x) ⟨lrem.sig⟩
+    {
+        Celula i = _primeiro; ⟨lrem.i⟩
+        while (i.Prox != null && i.Prox.Elemento != x) ⟨lrem.w⟩
+            i = i.Prox; ⟨lrem.av⟩
+        if (i.Prox == null) ⟨lrem.nf⟩
+            throw new InvalidOperationException($"Erro: {x} não encontrado!"); ⟨lrem.err⟩
+        if (i.Prox == _ultimo) ⟨lrem.ult⟩
+            _ultimo = i; ⟨lrem.u⟩
+        i.Prox = i.Prox.Prox;               // a célula de x sai da lista ⟨lrem.liga⟩
+    } ⟨lrem.fim⟩
+}`
+},
+java: {
+reserva: `class HashReserva {
+    private static final int NULO = -1;     // marca de posição vazia
+    private int[] tabela;
+    private int tamTabela, tamReserva, numReserva;
+
+    public HashReserva(int tamTabela, int tamReserva) {
+        this.tamTabela = tamTabela;
+        this.tamReserva = tamReserva;
+        numReserva = 0;
+        tabela = new int[tamTabela + tamReserva];
+        for (int i = 0; i < tabela.length; i++)
+            tabela[i] = NULO;
+    }
+
+    private int hash(int x) {
+        return x % tamTabela;
+    }
+
+    public void inserir(int x) throws Exception { ⟨ins.sig⟩
+        int i = hash(x); ⟨ins.i⟩
+        if (x == NULO) { ⟨ins.nulo⟩
+            throw new Exception("Erro: valor inválido!");
+        } else if (tabela[i] == NULO) { ⟨ins.livre⟩
+            tabela[i] = x; ⟨ins.put⟩
+        } else if (numReserva < tamReserva) { ⟨ins.res⟩
+            tabela[tamTabela + numReserva] = x; ⟨ins.putR⟩
+            numReserva++;       // o valor inicial de numReserva é zero ⟨ins.inc⟩
+        } else {
+            throw new Exception("Erro: área de reserva cheia!"); ⟨ins.err⟩
+        }
+    } ⟨ins.fim⟩
+
+    public int pesquisar(int x) { ⟨pes.sig⟩
+        int i = hash(x), resp = NULO; ⟨pes.i⟩
+        if (tabela[i] == x) { ⟨pes.eq⟩
+            resp = i; ⟨pes.resp⟩
+        } else if (tabela[i] != NULO) { ⟨pes.nn⟩
+            for (int k = 0; k < numReserva; k++) { ⟨pes.for⟩
+                if (tabela[tamTabela + k] == x) { ⟨pes.eqR⟩
+                    resp = tamTabela + k; ⟨pes.respR⟩
+                    break; ⟨pes.break⟩
+                }
+            }
+        }
+        return resp; ⟨pes.ret⟩
+    }
+
+    public void remover(int x) throws Exception { ⟨rem.sig⟩
+        int i = pesquisar(x); ⟨rem.call⟩
+        if (i == NULO) { ⟨rem.nf⟩
+            throw new Exception("Erro: " + x + " não encontrado!"); ⟨rem.err⟩
+        }
+        if (i < tamTabela) {                // x está na tabela principal ⟨rem.princ⟩
+            tabela[i] = NULO; ⟨rem.nulo⟩
+            // se um elemento da reserva tem o mesmo hash, ele sobe para a vaga
+            for (int k = tamTabela; k < tamTabela + numReserva; k++) { ⟨rem.for⟩
+                if (hash(tabela[k]) == i) { ⟨rem.h⟩
+                    tabela[i] = tabela[k]; ⟨rem.sobe⟩
+                    i = k;                  // agora a vaga a fechar é a k ⟨rem.ik⟩
+                    break; ⟨rem.break⟩
+                }
+            }
+        }
+        if (i >= tamTabela) {               // fecha o buraco na reserva ⟨rem.res⟩
+            for (int k = i; k < tamTabela + numReserva - 1; k++) ⟨rem.for2⟩
+                tabela[k] = tabela[k + 1]; ⟨rem.desloca⟩
+            numReserva--; ⟨rem.dec⟩
+            tabela[tamTabela + numReserva] = NULO; ⟨rem.limpa⟩
+        }
+    } ⟨rem.fim⟩
+}`,
+rehash: `class HashRehash {
+    private static final int NULO = -1;     // posição que nunca foi usada
+    private static final int REMOVIDO = -2; // posição cujo elemento foi removido
+    private int[] tabela;
+    private int tamTabela;
+
+    public HashRehash(int tamTabela) {
+        this.tamTabela = tamTabela;
+        tabela = new int[tamTabela];
+        for (int i = 0; i < tamTabela; i++)
+            tabela[i] = NULO;
+    }
+
+    private int hash(int x) {
+        return x % tamTabela;
+    }
+
+    private int rehash(int x) {
+        return ++x % tamTabela;
+    }
+
+    public void inserir(int x) throws Exception { ⟨ins.sig⟩
+        int i = hash(x); ⟨ins.i⟩
+        if (x == NULO || x == REMOVIDO) { ⟨ins.nulo⟩
+            throw new Exception("Erro: valor inválido!");
+        } else if (tabela[i] == NULO || tabela[i] == REMOVIDO) { ⟨ins.livre⟩
+            tabela[i] = x; ⟨ins.put⟩
+        } else {
+            i = rehash(x); ⟨ins.re⟩
+            if (tabela[i] == NULO || tabela[i] == REMOVIDO) { ⟨ins.livre2⟩
+                tabela[i] = x; ⟨ins.put2⟩
+            } else {
+                throw new Exception("Erro: não é possível inserir o " + x + "!"); ⟨ins.err⟩
+            }
+        }
+    } ⟨ins.fim⟩
+
+    public int pesquisar(int x) { ⟨pes.sig⟩
+        int i = hash(x), resp = NULO; ⟨pes.i⟩
+        if (tabela[i] == x) { ⟨pes.eq⟩
+            resp = i; ⟨pes.resp⟩
+        } else if (tabela[i] != NULO) { ⟨pes.nn⟩
+            i = rehash(x); ⟨pes.re⟩
+            if (tabela[i] == x) { ⟨pes.eq2⟩
+                resp = i; ⟨pes.resp2⟩
+            }
+        }
+        return resp; ⟨pes.ret⟩
+    }
+
+    public void remover(int x) throws Exception { ⟨rem.sig⟩
+        int i = pesquisar(x); ⟨rem.call⟩
+        if (i == NULO) { ⟨rem.nf⟩
+            throw new Exception("Erro: " + x + " não encontrado!"); ⟨rem.err⟩
+        }
+        // não pode voltar a NULO: a pesquisa de um elemento que foi
+        // para o rehash pararia nesta posição e não o encontraria
+        tabela[i] = REMOVIDO; ⟨rem.marca⟩
+    } ⟨rem.fim⟩
+}`,
+lista: `class HashLista {
+    private Lista[] tabela;
+    private int tamTabela;
+
+    public HashLista(int tamTabela) {
+        this.tamTabela = tamTabela;
+        tabela = new Lista[tamTabela];
+        for (int i = 0; i < tamTabela; i++)
+            tabela[i] = new Lista();
+    }
+
+    private int hash(int x) {
+        return x % tamTabela;
+    }
+
+    public void inserir(int x) throws Exception { ⟨ins.sig⟩
+        if (pesquisar(x) == true) { ⟨ins.pes⟩
+            throw new Exception("Erro: " + x + " já existe!"); ⟨ins.err⟩
+        } else {
+            tabela[hash(x)].inserir(x); ⟨ins.put⟩
+        }
+    } ⟨ins.fim⟩
+
+    public boolean pesquisar(int x) { ⟨pes.sig⟩
+        return tabela[hash(x)].pesquisar(x); ⟨pes.call⟩
+    }
+
+    public void remover(int x) throws Exception { ⟨rem.sig⟩
+        tabela[hash(x)].remover(x); ⟨rem.call⟩
+    } ⟨rem.fim⟩
+}
+
+class Celula {
+    int elemento;
+    Celula prox;
+
+    Celula(int elemento) {
+        this.elemento = elemento;
+        prox = null;
+    }
+}
+
+class Lista {
+    private Celula primeiro, ultimo;        // primeiro é a célula cabeça
+
+    public Lista() {
+        primeiro = new Celula(-1);
+        ultimo = primeiro;
+    }
+
+    public void inserir(int x) {            // insere no fim ⟨lins.sig⟩
+        ultimo.prox = new Celula(x); ⟨lins.a⟩
+        ultimo = ultimo.prox; ⟨lins.b⟩
+    } ⟨lins.fim⟩
+
+    public boolean pesquisar(int x) { ⟨lpes.sig⟩
+        for (Celula i = primeiro.prox; i != null; i = i.prox) ⟨lpes.for⟩
+            if (i.elemento == x) ⟨lpes.eq⟩
+                return true; ⟨lpes.t⟩
+        return false; ⟨lpes.f⟩
+    }
+
+    public void remover(int x) throws Exception { ⟨lrem.sig⟩
+        Celula i = primeiro; ⟨lrem.i⟩
+        while (i.prox != null && i.prox.elemento != x) ⟨lrem.w⟩
+            i = i.prox; ⟨lrem.av⟩
+        if (i.prox == null) { ⟨lrem.nf⟩
+            throw new Exception("Erro: " + x + " não encontrado!"); ⟨lrem.err⟩
+        }
+        if (i.prox == ultimo) ⟨lrem.ult⟩
+            ultimo = i; ⟨lrem.u⟩
+        i.prox = i.prox.prox;               // a célula de x sai da lista ⟨lrem.liga⟩
+    } ⟨lrem.fim⟩
+}`
+}
+};
+
+const MARCA = /\s*⟨([^⟩]+)⟩\s*$/;
+function processa(txt) {
+  const linhas = [], ids = {};
+  txt.split('\n').forEach((l, n) => {
+    const mm = l.match(MARCA);
+    if (mm) { for (const id of mm[1].split(',')) ids[id] = n; l = l.replace(MARCA, ''); }
+    linhas.push(l.replace(/\s+$/, ''));
+  });
+  return { linhas, ids };
+}
+const _cache = {};
+function codigo(lang, tec) { const k = lang + tec; return _cache[k] || (_cache[k] = processa(SRC[lang][tec])); }
+const ARQ = { cs: { reserva: 'HashReserva.cs', rehash: 'HashRehash.cs', lista: 'HashLista.cs' }, java: { reserva: 'HashReserva.java', rehash: 'HashRehash.java', lista: 'HashLista.java' } };
+function fonte(lang, tec) {
+  const corpo = codigo(lang, tec).linhas;
+  const cab = ['// Tabela hash — Algoritmos e Estruturas de Dados — PUC Minas', '// Prof. Rodrigo Richard Gomes'];
+  if (lang === 'cs') return [...cab, 'using System;', '', 'namespace AED', '{', ...corpo.map(l => l ? '    ' + l : l), '}', ''].join('\n');
+  return [...cab, '', ...corpo, ''].join('\n');
+}
+if (typeof module !== 'undefined') module.exports = { SRC, processa, codigo, fonte, ARQ };
+
+/* Núcleo do simulador de hash: modelos + geração dos passos (espelha codigo.js) */
+if (typeof module !== 'undefined' && typeof codigo === 'undefined') { var { codigo } = require('./codigo.js'); }
+
+const NULO = -1, REMOVIDO = -2;
+const NOMES = {
+  cs:   { tab: '_tabela', tamT: '_tamTabela', tamR: '_tamReserva', numR: '_numReserva', prox: 'Prox', el: 'Elemento', prim: '_primeiro', ult: '_ultimo', F: s => s[0].toUpperCase() + s.slice(1) },
+  java: { tab: 'tabela',  tamT: 'tamTabela',  tamR: 'tamReserva',  numR: 'numReserva',  prox: 'prox', el: 'elemento', prim: 'primeiro',  ult: 'ultimo',  F: s => s }
+};
+const b = s => `<b>${s}</b>`, c = s => `<code>${s}</code>`;
+const mostraV = v => v === NULO ? 'NULO' : v === REMOVIDO ? 'REMOVIDO' : String(v);
+
+/* ---------------- modelos (operações diretas, sem passos) ---------------- */
+class Tabela {
+  constructor(tec, m, r = 3) { this.tec = tec; this.m = m; this.r = tec === 'reserva' ? r : 0; this.limpa(); }
+  limpa() {
+    if (this.tec === 'lista') this.listas = Array.from({ length: this.m }, () => []);
+    else { this.tab = new Array(this.m + this.r).fill(NULO); this.num = 0; }
+  }
+  snap() { return this.tec === 'lista' ? { listas: this.listas.map(l => l.slice()) } : { tab: this.tab.slice(), num: this.num }; }
+  restaura(s) { if (s.listas) this.listas = s.listas.map(l => l.slice()); else { this.tab = s.tab.slice(); this.num = s.num; } }
+  hash(x) { return x % this.m; }
+  rehash(x) { return (x + 1) % this.m; }
+  n() { return this.tec === 'lista' ? this.listas.reduce((a, l) => a + l.length, 0) : this.tab.filter(v => v >= 0).length; }
+  pesquisar(x) {
+    const { m } = this;
+    if (this.tec === 'lista') return this.listas[this.hash(x)].includes(x);
+    let i = this.hash(x);
+    if (this.tec === 'reserva') {
+      if (this.tab[i] === x) return i;
+      if (this.tab[i] !== NULO) for (let k = 0; k < this.num; k++) if (this.tab[m + k] === x) return m + k;
+      return NULO;
+    }
+    if (this.tab[i] === x) return i;
+    if (this.tab[i] !== NULO) { i = this.rehash(x); if (this.tab[i] === x) return i; }
+    return NULO;
+  }
+  inserir(x) {
+    const { m } = this;
+    if (this.tec === 'lista') { if (this.pesquisar(x)) throw new Error(`Erro: ${x} já existe!`); this.listas[this.hash(x)].push(x); return; }
+    let i = this.hash(x);
+    if (this.tec === 'reserva') {
+      if (this.tab[i] === NULO) this.tab[i] = x;
+      else if (this.num < this.r) { this.tab[m + this.num] = x; this.num++; }
+      else throw new Error('Erro: área de reserva cheia!');
+      return;
+    }
+    if (this.tab[i] === NULO || this.tab[i] === REMOVIDO) { this.tab[i] = x; return; }
+    i = this.rehash(x);
+    if (this.tab[i] === NULO || this.tab[i] === REMOVIDO) { this.tab[i] = x; return; }
+    throw new Error(`Erro: não é possível inserir o ${x}!`);
+  }
+  remover(x) {
+    const { m } = this;
+    if (this.tec === 'lista') { const l = this.listas[this.hash(x)], p = l.indexOf(x); if (p < 0) throw new Error(`Erro: ${x} não encontrado!`); l.splice(p, 1); return; }
+    let i = this.pesquisar(x);
+    if (i === NULO) throw new Error(`Erro: ${x} não encontrado!`);
+    if (this.tec === 'rehash') { this.tab[i] = REMOVIDO; return; }
+    if (i < m) {
+      this.tab[i] = NULO;
+      for (let k = m; k < m + this.num; k++) if (this.hash(this.tab[k]) === i) { this.tab[i] = this.tab[k]; i = k; break; }
+    }
+    if (i >= m) { for (let k = i; k < m + this.num - 1; k++) this.tab[k] = this.tab[k + 1]; this.num--; this.tab[m + this.num] = NULO; }
+  }
+}
+
+/* ---------------- gerador de passos ---------------- */
+class Trace {
+  constructor(T, lang, op, x) {
+    this.T = T; this.lang = lang; this.N = NOMES[lang]; this.op = op; this.x = x;
+    this.cod = codigo(lang, T.tec); this.passos = []; this.pilha = []; this.cmp = 0; this.marca = {};
+  }
+  F(s) { return this.N.F(s); }
+  tab(i) { return `${this.N.tab}[${i}]`; }
+  passo(id, nota, extra = {}) {
+    const linha = this.cod.ids[id];
+    if (linha === undefined) throw new Error(`linha sem marcador: ${this.lang}/${this.T.tec}/${id}`);
+    this.passos.push({ linha, nota, est: this.T.snap(), cmp: this.cmp, marca: { ...this.marca },
+      pilha: this.pilha.map(f => ({ nome: f.nome, vars: f.vars.map(v => [...v]), aguarda: f.aguarda })), ...extra });
+  }
+  quadro(nome, vars) { this.pilha.push({ nome, vars }); }
+  set(nome, valor) { const f = this.pilha[this.pilha.length - 1]; const v = f.vars.find(q => q[0] === nome); if (v) v[1] = valor; else f.vars.push([nome, valor]); }
+  sai() { this.pilha.pop(); }
+  txtHash(x, fn = 'hash') {
+    const m = this.T.m;
+    return fn === 'hash' ? `${c(this.F('hash') + '(' + x + ')')} = ${x} % ${m} = ${b(x % m)}` : `${c(this.F('rehash') + '(' + x + ')')} = ${x + 1} % ${m} = ${b((x + 1) % m)}`;
+  }
+}
+
+/* ===================== área de reserva ===================== */
+function reservaPesquisar(t, x, chamada) {
+  const T = t.T, m = T.m, N = t.N;
+  t.quadro(`${t.F('pesquisar')}(x)`, [['x', x]]);
+  t.passo('pes.sig', chamada ? `Chamada ${c(t.F('pesquisar') + '(' + x + ')')} feita por ${c(t.F('remover'))}.` : `Chamada ${c(t.F('pesquisar') + '(' + x + ')')}.`);
+  const i = T.hash(x); t.set('i', i); t.set('resp', 'NULO');
+  t.passo('pes.i', `${t.txtHash(x)}: o lugar do ${x} seria a posição ${i}. ${c('resp')} começa com NULO.`, { sonda: { pos: i } });
+  t.cmp++;
+  const v = T.tab[i];
+  if (v === x) {
+    t.passo('pes.eq', `${c(t.tab(i) + ' == x')}? ${t.tab(i)} = ${mostraV(v)}: ${b('true')} (comparação nº ${t.cmp})`, { sonda: { pos: i }, cmpPos: i });
+    t.set('resp', i); t.marca[i] = 'achou';
+    t.passo('pes.resp', `${c('resp = ' + i)}: achou na própria posição de hash.`, { sonda: { pos: i } });
+  } else {
+    t.passo('pes.eq', `${c(t.tab(i) + ' == x')}? ${t.tab(i)} = ${mostraV(v)}: ${b('false')} (comparação nº ${t.cmp})`, { sonda: { pos: i, rotulo: v === NULO ? 'livre' : 'ocupado' }, cmpPos: i });
+    const nn = v !== NULO;
+    t.passo('pes.nn', `${c(t.tab(i) + ' != NULO')}? ${b(nn)}${nn ? `: a posição está ocupada por outro elemento, então o ${x} pode ter ido para a área de reserva` : `: a posição está vazia, então o ${x} não pode estar na tabela (nem na reserva)`}.`, { sonda: { pos: i } });
+    if (nn) {
+      for (let k = 0; ; k++) {
+        t.set('k', k);
+        const cont = k < T.num;
+        t.passo('pes.for', `${c('k < ' + N.numR)}? ${k} < ${T.num}: ${b(cont)}${cont ? `: examina a posição ${m + k} da reserva` : ': a reserva acabou'}.`, cont ? { sonda: { pos: m + k } } : {});
+        if (!cont) break;
+        t.cmp++;
+        const w = T.tab[m + k], eq = w === x;
+        t.passo('pes.eqR', `${c(`${N.tab}[${N.tamT} + k] == x`)}? ${t.tab(m + k)} = ${mostraV(w)}: ${b(eq)} (comparação nº ${t.cmp})`, { sonda: { pos: m + k }, cmpPos: m + k });
+        if (eq) {
+          t.set('resp', m + k); t.marca[m + k] = 'achou';
+          t.passo('pes.respR', `${c('resp = ' + (m + k))}: achou na área de reserva.`, { sonda: { pos: m + k } });
+          t.passo('pes.break', `${c('break')}: sai do laço.`);
+          break;
+        }
+      }
+    }
+  }
+  const resp = T.pesquisar(x);
+  t.passo('pes.ret', `${c('return resp')}: devolve ${b(mostraV(resp))}${resp === NULO ? ` (o ${x} não está na tabela)` : ''}. Foram feitas ${b(t.cmp)} comparaç${t.cmp === 1 ? 'ão' : 'ões'} com x.`, chamada ? {} : { resultado: mostraV(resp) });
+  t.sai();
+  return resp;
+}
+function reservaInserir(t, x) {
+  const T = t.T, m = T.m, N = t.N;
+  t.quadro(`${t.F('inserir')}(x)`, [['x', x]]);
+  t.passo('ins.sig', `Chamada ${c(t.F('inserir') + '(' + x + ')')}.`);
+  const i = T.hash(x); t.set('i', i);
+  t.passo('ins.i', `${t.txtHash(x)}.`, { sonda: { pos: i } });
+  t.passo('ins.nulo', `${c('x == NULO')}? ${b('false')}: o valor é válido.`, { sonda: { pos: i } });
+  const livre = T.tab[i] === NULO;
+  t.passo('ins.livre', `${c(t.tab(i) + ' == NULO')}? ${b(livre)}: a posição ${i} está ${livre ? b('livre') : b('ocupada') + ' pelo ' + T.tab[i] + ' (colisão)'}.`, { sonda: { pos: i, rotulo: livre ? 'livre' : 'ocupado' } });
+  if (livre) {
+    T.tab[i] = x; t.marca[i] = 'novo';
+    t.passo('ins.put', `${c(t.tab(i) + ' = ' + x)}: o ${x} fica na sua posição de hash.`, { sonda: { pos: i } });
+  } else {
+    const cabe = T.num < T.r, dest = m + T.num;
+    t.passo('ins.res', `${c(N.numR + ' < ' + N.tamR)}? ${T.num} < ${T.r}: ${b(cabe)}${cabe ? `: ainda há lugar na área de reserva (próxima posição livre: ${dest})` : ': a área de reserva está cheia'}.`, cabe ? { sonda: { pos: dest, rotulo: 'livre' } } : {});
+    if (cabe) {
+      T.tab[dest] = x; t.marca[dest] = 'novo';
+      t.passo('ins.putR', `${c(`${N.tab}[${N.tamT} + ${N.numR}] = x`)}: ${t.tab(dest)} = ${x}. O ${x} vai para a área de reserva.`, { sonda: { pos: dest } });
+      T.num++;
+      t.passo('ins.inc', `${c(N.numR + '++')}: agora há ${T.num} elemento${T.num > 1 ? 's' : ''} na reserva.`);
+    } else {
+      t.passo('ins.err', `Não há onde guardar o ${x}: lança uma exceção. ${b('A inserção falhou')}.`, { erro: true });
+      t.sai(); return false;
+    }
+  }
+  t.passo('ins.fim', `Fim de ${c(t.F('inserir') + '(' + x + ')')}. Note que este código ${b('não verifica')} se o ${x} já estava na tabela.`);
+  t.sai(); return true;
+}
+function reservaRemover(t, x) {
+  const T = t.T, m = T.m, N = t.N;
+  t.quadro(`${t.F('remover')}(x)`, [['x', x]]);
+  t.passo('rem.sig', `Chamada ${c(t.F('remover') + '(' + x + ')')}.`);
+  t.pilha[0].aguarda = 'i';
+  t.passo('rem.call', `Primeiro procura o ${x}: chama ${c(t.F('pesquisar') + '(x)')}; o resultado vai para ${c('i')}.`);
+  let i = reservaPesquisar(t, x, true);
+  t.pilha[0].aguarda = undefined; t.set('i', mostraV(i));
+  t.passo('rem.call', `De volta: ${c('i = ' + mostraV(i))}.`, i >= 0 ? { sonda: { pos: i } } : {});
+  t.passo('rem.nf', `${c('i == NULO')}? ${b(i === NULO)}`);
+  if (i === NULO) { t.passo('rem.err', `O ${x} não está na tabela: lança uma exceção.`, { erro: true }); t.sai(); return false; }
+  for (const k in t.marca) delete t.marca[k];
+  const princ = i < m;
+  t.passo('rem.princ', `${c('i < ' + N.tamT)}? ${i} < ${m}: ${b(princ)}${princ ? ': o ' + x + ' está na tabela principal' : ': o ' + x + ' está na área de reserva'}.`, { sonda: { pos: i } });
+  if (princ) {
+    T.tab[i] = NULO; t.marca[i] = 'vaga';
+    t.passo('rem.nulo', `${c(t.tab(i) + ' = NULO')}: a posição ${i} fica vazia. Mas algum elemento da reserva pode ter o mesmo hash (${i}): se a posição ${i} ficasse vazia, a pesquisa dele pararia aqui e não o encontraria.`, { sonda: { pos: i } });
+    for (let k = m; ; k++) {
+      t.set('k', k);
+      const cont = k < m + T.num;
+      t.passo('rem.for', `${c(`k < ${N.tamT} + ${N.numR}`)}? ${k} < ${m + T.num}: ${b(cont)}${cont ? '' : ': nenhum elemento da reserva tem hash ' + i}.`, cont ? { sonda: { pos: k } } : {});
+      if (!cont) break;
+      const h = T.hash(T.tab[k]), mesmo = h === i;
+      t.passo('rem.h', `${c(t.F('hash') + '(' + t.tab(k) + ') == i')}? ${t.F('hash')}(${T.tab[k]}) = ${T.tab[k]} % ${m} = ${h}: ${b(mesmo)}`, { sonda: { pos: k } });
+      if (mesmo) {
+        T.tab[i] = T.tab[k]; t.marca[i] = 'novo';
+        t.passo('rem.sobe', `${c(t.tab(i) + ' = ' + t.tab(k))}: o ${T.tab[k]} ${b('sobe')} da reserva para a posição ${i}, que é a posição de hash dele.`, { sonda: { pos: i }, seta: [k, i] });
+        i = k; t.set('i', i); t.marca[k] = 'vaga';
+        t.passo('rem.ik', `${c('i = k = ' + k)}: agora quem precisa ser fechada é a posição ${k} da reserva.`, { sonda: { pos: k } });
+        t.passo('rem.break', `${c('break')}: sai do laço.`);
+        break;
+      }
+    }
+  }
+  const res = i >= m;
+  t.passo('rem.res', `${c('i >= ' + N.tamT)}? ${i} >= ${m}: ${b(res)}${res ? ': fecha o buraco na reserva, deslocando os seguintes uma posição para cima' : ''}.`, res ? { sonda: { pos: i } } : {});
+  if (res) {
+    for (let k = i; ; k++) {
+      t.set('k', k);
+      const cont = k < m + T.num - 1;
+      t.passo('rem.for2', `${c(`k < ${N.tamT} + ${N.numR} - 1`)}? ${k} < ${m + T.num - 1}: ${b(cont)}`, cont ? { sonda: { pos: k } } : {});
+      if (!cont) break;
+      T.tab[k] = T.tab[k + 1]; delete t.marca[k]; t.marca[k] = 'novo';
+      t.passo('rem.desloca', `${c(t.tab(k) + ' = ' + t.tab(k + 1))}: o ${T.tab[k]} sobe uma posição.`, { sonda: { pos: k }, seta: [k + 1, k] });
+    }
+    T.num--;
+    t.passo('rem.dec', `${c(N.numR + '--')}: agora há ${T.num} elemento${T.num === 1 ? '' : 's'} na reserva.`);
+    T.tab[m + T.num] = NULO; t.marca[m + T.num] = 'vaga';
+    t.passo('rem.limpa', `${c(`${N.tab}[${N.tamT} + ${N.numR}] = NULO`)}: a última posição usada da reserva (${m + T.num}) fica livre.`, { sonda: { pos: m + T.num } });
+  }
+  for (const k in t.marca) delete t.marca[k];
+  t.passo('rem.fim', `Fim: ${x} removido.`);
+  t.sai(); return true;
+}
+
+/* ===================== rehash ===================== */
+function rehashPesquisar(t, x, chamada) {
+  const T = t.T, m = T.m;
+  t.quadro(`${t.F('pesquisar')}(x)`, [['x', x]]);
+  t.passo('pes.sig', chamada ? `Chamada ${c(t.F('pesquisar') + '(' + x + ')')} feita por ${c(t.F('remover'))}.` : `Chamada ${c(t.F('pesquisar') + '(' + x + ')')}.`);
+  let i = T.hash(x); t.set('i', i); t.set('resp', 'NULO');
+  t.passo('pes.i', `${t.txtHash(x)}. ${c('resp')} começa com NULO.`, { sonda: { pos: i } });
+  t.cmp++;
+  let v = T.tab[i];
+  t.passo('pes.eq', `${c(t.tab(i) + ' == x')}? ${t.tab(i)} = ${mostraV(v)}: ${b(v === x)} (comparação nº ${t.cmp})`, { sonda: { pos: i, rotulo: v === x ? undefined : v === NULO ? 'livre' : v === REMOVIDO ? 'removido' : 'ocupado' }, cmpPos: i });
+  if (v === x) { t.set('resp', i); t.marca[i] = 'achou'; t.passo('pes.resp', `${c('resp = ' + i)}: achou na posição de hash.`, { sonda: { pos: i } }); }
+  else {
+    const nn = v !== NULO;
+    t.passo('pes.nn', `${c(t.tab(i) + ' != NULO')}? ${b(nn)}${nn ? `: a posição ${v === REMOVIDO ? 'teve um elemento removido' : 'está ocupada por outro elemento'}, então o ${x} pode ter ido para o rehash` : `: a posição nunca foi usada, então o ${x} não está na tabela`}.`, { sonda: { pos: i } });
+    if (nn) {
+      i = T.rehash(x); t.set('i', i);
+      t.passo('pes.re', `${t.txtHash(x, 'rehash')}: a única outra posição possível.`, { sonda: { pos: i } });
+      t.cmp++; v = T.tab[i];
+      t.passo('pes.eq2', `${c(t.tab(i) + ' == x')}? ${t.tab(i)} = ${mostraV(v)}: ${b(v === x)} (comparação nº ${t.cmp})`, { sonda: { pos: i }, cmpPos: i });
+      if (v === x) { t.set('resp', i); t.marca[i] = 'achou'; t.passo('pes.resp2', `${c('resp = ' + i)}: achou na posição do rehash.`, { sonda: { pos: i } }); }
+    }
+  }
+  const resp = T.pesquisar(x);
+  t.passo('pes.ret', `${c('return resp')}: devolve ${b(mostraV(resp))}${resp === NULO ? ` (o ${x} não está na tabela)` : ''}. Foram feitas ${b(t.cmp)} comparaç${t.cmp === 1 ? 'ão' : 'ões'} com x.`, chamada ? {} : { resultado: mostraV(resp) });
+  t.sai(); return resp;
+}
+function rehashInserir(t, x) {
+  const T = t.T;
+  t.quadro(`${t.F('inserir')}(x)`, [['x', x]]);
+  t.passo('ins.sig', `Chamada ${c(t.F('inserir') + '(' + x + ')')}.`);
+  let i = T.hash(x); t.set('i', i);
+  t.passo('ins.i', `${t.txtHash(x)}.`, { sonda: { pos: i } });
+  t.passo('ins.nulo', `${c('x == NULO || x == REMOVIDO')}? ${b('false')}: o valor é válido.`, { sonda: { pos: i } });
+  let v = T.tab[i], livre = v === NULO || v === REMOVIDO;
+  t.passo('ins.livre', `${c(`${t.tab(i)} == NULO || ${t.tab(i)} == REMOVIDO`)}? ${t.tab(i)} = ${mostraV(v)}: ${b(livre)}${livre ? '' : ': colisão com o ' + v}.`, { sonda: { pos: i, rotulo: livre ? 'livre' : 'ocupado' } });
+  if (livre) { T.tab[i] = x; t.marca[i] = 'novo'; t.passo('ins.put', `${c(t.tab(i) + ' = ' + x)}: o ${x} fica na sua posição de hash.`, { sonda: { pos: i } }); }
+  else {
+    i = T.rehash(x); t.set('i', i);
+    t.passo('ins.re', `Tenta o rehash: ${t.txtHash(x, 'rehash')}.`, { sonda: { pos: i } });
+    v = T.tab[i]; livre = v === NULO || v === REMOVIDO;
+    t.passo('ins.livre2', `${c(`${t.tab(i)} == NULO || ${t.tab(i)} == REMOVIDO`)}? ${t.tab(i)} = ${mostraV(v)}: ${b(livre)}${livre ? '' : ': também está ocupada'}.`, { sonda: { pos: i, rotulo: livre ? 'livre' : 'ocupado' } });
+    if (livre) { T.tab[i] = x; t.marca[i] = 'novo'; t.passo('ins.put2', `${c(t.tab(i) + ' = ' + x)}: o ${x} fica na posição do rehash.`, { sonda: { pos: i } }); }
+    else {
+      t.passo('ins.err', `${b('Não é possível inserir o ' + x)}: a posição de hash e a do rehash estão ocupadas. Este rehash faz uma única tentativa.`, { erro: true, sonda: { pos: i, rotulo: 'ocupado' } });
+      t.sai(); return false;
+    }
+  }
+  t.passo('ins.fim', `Fim de ${c(t.F('inserir') + '(' + x + ')')}. Note que este código ${b('não verifica')} se o ${x} já estava na tabela.`);
+  t.sai(); return true;
+}
+function rehashRemover(t, x) {
+  const T = t.T;
+  t.quadro(`${t.F('remover')}(x)`, [['x', x]]);
+  t.passo('rem.sig', `Chamada ${c(t.F('remover') + '(' + x + ')')}.`);
+  t.pilha[0].aguarda = 'i';
+  t.passo('rem.call', `Primeiro procura o ${x}: chama ${c(t.F('pesquisar') + '(x)')}; o resultado vai para ${c('i')}.`);
+  const i = rehashPesquisar(t, x, true);
+  t.pilha[0].aguarda = undefined; t.set('i', mostraV(i));
+  t.passo('rem.call', `De volta: ${c('i = ' + mostraV(i))}.`, i >= 0 ? { sonda: { pos: i } } : {});
+  t.passo('rem.nf', `${c('i == NULO')}? ${b(i === NULO)}`);
+  if (i === NULO) { t.passo('rem.err', `O ${x} não está na tabela: lança uma exceção.`, { erro: true }); t.sai(); return false; }
+  for (const k in t.marca) delete t.marca[k];
+  T.tab[i] = REMOVIDO; t.marca[i] = 'vaga';
+  t.passo('rem.marca', `${c(t.tab(i) + ' = REMOVIDO')}: a posição fica marcada como removida (não como NULO). Assim, a pesquisa de um elemento que colidiu aqui e foi para o rehash continua até a posição dele. Uma inserção pode reaproveitar esta posição.`, { sonda: { pos: i } });
+  t.passo('rem.fim', `Fim: ${x} removido.`);
+  t.sai(); return true;
+}
+
+/* ===================== lista encadeada ===================== */
+function listaPesquisarL(t, x, h) {
+  const T = t.T, N = t.N, L = T.listas[h];
+  t.quadro(`Lista.${t.F('pesquisar')}(x)`, [['x', x], ['i', '?']]);
+  const lst = q => ({ k: h, i: q });
+  t.passo('lpes.sig', `Na lista da posição ${h} (${L.length ? L.join(' → ') : 'vazia'}): procura o ${x} célula por célula.`, { lst: lst(null) });
+  for (let q = 0; ; q++) {
+    const fim = q >= L.length;
+    t.set('i', fim ? 'null' : `célula(${L[q]})`);
+    t.passo('lpes.for', `${q === 0 ? c('i = ' + N.prim + '.' + N.prox) + ' (a primeira célula depois da cabeça)' : c('i = i.' + N.prox)}. ${c('i != null')}? ${b(!fim)}${fim ? ': a lista acabou' : ''}.`, { lst: lst(fim ? null : q) });
+    if (fim) break;
+    t.cmp++;
+    const eq = L[q] === x;
+    t.passo('lpes.eq', `${c('i.' + N.el + ' == x')}? ${L[q]} == ${x}: ${b(eq)} (comparação nº ${t.cmp})`, { lst: lst(q) });
+    if (eq) { t.passo('lpes.t', `Encontrou: ${b('devolve true')}.`, { lst: { ...lst(q), achou: q } }); t.sai(); return true; }
+  }
+  t.passo('lpes.f', `${b('Devolve false')}: o ${x} não está nesta lista.`, { lst: lst(null) });
+  t.sai(); return false;
+}
+function listaPesquisar(t, x, chamada) {
+  const T = t.T, h = T.hash(x);
+  t.quadro(`${t.F('pesquisar')}(x)`, [['x', x]]);
+  t.passo('pes.sig', chamada ? `Chamada ${c(t.F('pesquisar') + '(' + x + ')')} feita por ${c(t.F('inserir'))}, para não inserir repetido.` : `Chamada ${c(t.F('pesquisar') + '(' + x + ')')}.`);
+  t.pilha[t.pilha.length - 1].aguarda = 'retorno';
+  t.passo('pes.call', `${t.txtHash(x)}: só a lista da posição ${h} pode ter o ${x}. Chama o ${c(t.F('pesquisar'))} dessa lista.`, { sonda: { pos: h }, lst: { k: h, i: null } });
+  const r = listaPesquisarL(t, x, h);
+  t.pilha[t.pilha.length - 1].aguarda = undefined;
+  t.passo('pes.call', `A lista devolveu ${b(r)}; ${c(t.F('pesquisar'))} repassa o resultado. Foram feitas ${b(t.cmp)} comparaç${t.cmp === 1 ? 'ão' : 'ões'} com x.`, { sonda: { pos: h }, ...(chamada ? {} : { resultado: String(r) }) });
+  t.sai(); return r;
+}
+function listaInserir(t, x) {
+  const T = t.T, N = t.N, h = T.hash(x);
+  t.quadro(`${t.F('inserir')}(x)`, [['x', x]]);
+  t.passo('ins.sig', `Chamada ${c(t.F('inserir') + '(' + x + ')')}.`);
+  t.pilha[0].aguarda = 'retorno';
+  t.passo('ins.pes', `Antes de inserir, verifica se o ${x} já existe: chama ${c(t.F('pesquisar') + '(x)')}.`);
+  const ja = listaPesquisar(t, x, true);
+  t.pilha[0].aguarda = undefined;
+  t.passo('ins.pes', `${c(t.F('pesquisar') + '(x)')} devolveu ${b(ja)}${ja ? '' : ': pode inserir'}.`);
+  if (ja) { t.passo('ins.err', `O ${x} ${b('já existe')}: lança uma exceção.`, { erro: true }); t.sai(); return false; }
+  t.pilha[0].aguarda = 'retorno';
+  t.passo('ins.put', `${t.txtHash(x)}: insere o ${x} na lista da posição ${h}.`, { sonda: { pos: h }, lst: { k: h, i: null } });
+  t.quadro(`Lista.${t.F('inserir')}(x)`, [['x', x]]);
+  const L = T.listas[h];
+  t.passo('lins.sig', `Na lista da posição ${h}: insere no fim.`, { lst: { k: h, i: null, ult: L.length - 1 } });
+  L.push(x);
+  t.passo('lins.a', `${c(N.ult + '.' + N.prox + ' = new Celula(' + x + ')')}: a nova célula é ligada depois da última.`, { lst: { k: h, i: null, novo: L.length - 1, ult: L.length - 2 } });
+  t.passo('lins.b', `${c(N.ult + ' = ' + N.ult + '.' + N.prox)}: a nova célula passa a ser a última.`, { lst: { k: h, i: null, novo: L.length - 1, ult: L.length - 1 } });
+  t.sai(); t.pilha[0].aguarda = undefined;
+  t.passo('ins.fim', `Fim: ${x} inserido na lista da posição ${h}, que agora tem ${L.length} elemento${L.length > 1 ? 's' : ''}.`, { lst: { k: h, i: null, novo: L.length - 1 } });
+  t.sai(); return true;
+}
+function listaRemover(t, x) {
+  const T = t.T, N = t.N, h = T.hash(x), L = T.listas[h];
+  t.quadro(`${t.F('remover')}(x)`, [['x', x]]);
+  t.passo('rem.sig', `Chamada ${c(t.F('remover') + '(' + x + ')')}.`);
+  t.pilha[0].aguarda = 'retorno';
+  t.passo('rem.call', `${t.txtHash(x)}: chama o ${c(t.F('remover'))} da lista da posição ${h}.`, { sonda: { pos: h }, lst: { k: h, i: null } });
+  t.quadro(`Lista.${t.F('remover')}(x)`, [['x', x], ['i', '?']]);
+  const lst = (q, extra = {}) => ({ k: h, i: q, ...extra });
+  t.passo('lrem.sig', `Na lista da posição ${h}: procura a célula ${b('anterior')} à do ${x}, para poder desligá-la.`, { lst: lst(null) });
+  let q = -1; t.set('i', 'cabeça');
+  t.passo('lrem.i', `${c('i = ' + N.prim)}: ${c('i')} começa na célula cabeça.`, { lst: lst(-1) });
+  for (;;) {
+    const temProx = q + 1 < L.length;
+    let cond;
+    if (!temProx) cond = `${c('i.' + N.prox + ' != null')}? ${b('false')}: chegou ao fim da lista`;
+    else { t.cmp++; const dif = L[q + 1] !== x; cond = `${c('i.' + N.prox + ' != null')}? ${b('true')}; ${c('i.' + N.prox + '.' + N.el + ' != x')}? ${L[q + 1]} != ${x}: ${b(dif)} (comparação nº ${t.cmp})`; if (!dif) { t.passo('lrem.w', cond + `: a próxima célula é a do ${x}.`, { lst: lst(q, { alvo: q + 1 }) }); break; } }
+    t.passo('lrem.w', cond + '.', { lst: lst(q) });
+    if (!temProx) break;
+    q++; t.set('i', `célula(${L[q]})`);
+    t.passo('lrem.av', `${c('i = i.' + N.prox)}: avança para a célula do ${L[q]}.`, { lst: lst(q) });
+  }
+  const achou = q + 1 < L.length;
+  t.passo('lrem.nf', `${c('i.' + N.prox + ' == null')}? ${b(!achou)}`, { lst: lst(q, achou ? { alvo: q + 1 } : {}) });
+  if (!achou) { t.passo('lrem.err', `O ${x} não está na lista: lança uma exceção.`, { erro: true, lst: lst(q) }); t.sai(); t.sai(); return false; }
+  const ult = q + 1 === L.length - 1;
+  t.passo('lrem.ult', `${c('i.' + N.prox + ' == ' + N.ult)}? ${b(ult)}${ult ? `: o ${x} está na última célula, então ${c(N.ult)} precisa voltar uma célula` : ''}.`, { lst: lst(q, { alvo: q + 1, ult: L.length - 1 }) });
+  if (ult) t.passo('lrem.u', `${c(N.ult + ' = i')}: a célula de ${c('i')} passa a ser a última.`, { lst: lst(q, { alvo: q + 1, ult: q }) });
+  L.splice(q + 1, 1);
+  t.passo('lrem.liga', `${c('i.' + N.prox + ' = i.' + N.prox + '.' + N.prox)}: a célula de ${c('i')} passa a apontar para a seguinte à do ${x}. A célula do ${x} fica fora da lista${t.lang === 'cs' || t.lang === 'java' ? ' (o coletor de lixo libera a memória)' : ''}.`, { lst: lst(q, { liga: true }) });
+  t.sai(); t.pilha[0].aguarda = undefined;
+  t.passo('rem.fim', `Fim: ${x} removido da lista da posição ${h}.`, { lst: { k: h, i: null } });
+  t.sai(); return true;
+}
+
+/* ---------------- entrada ---------------- */
+const OPS = {
+  reserva: { ins: reservaInserir, pes: reservaPesquisar, rem: reservaRemover },
+  rehash: { ins: rehashInserir, pes: rehashPesquisar, rem: rehashRemover },
+  lista: { ins: listaInserir, pes: listaPesquisar, rem: listaRemover }
+};
+function trace(T, lang, op, x) {
+  const t = new Trace(T, lang, op, x);
+  const ok = OPS[T.tec][op](t, x, false);
+  const fim = t.passos[t.passos.length - 1];
+  fim.ok = ok !== false;
+  return t.passos;
+}
+if (typeof module !== 'undefined') module.exports = { Tabela, trace, NULO, REMOVIDO };
+
+{
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+const KW = /\b(public|private|protected|static|final|const|void|int|bool|boolean|if|else|return|new|throw|throws|null|class|for|while|break|true|false|this|using|namespace|get|set)\b/g;
+function colore(l) {
+  let com = '', i = l.indexOf('//');
+  if (i >= 0) { com = '<span class="cm">' + esc(l.slice(i)) + '</span>'; l = l.slice(0, i); }
+  const partes = l.split(/("[^"]*")/);
+  return partes.map((p, k) => k % 2 ? '<span class="st">' + esc(p) + '</span>' : esc(p).replace(KW, '<span class="kw">$1</span>')).join('') + com;
+}
+const guarda = (k, v) => { try { localStorage.setItem(k, v); } catch {} };
+const le = k => { try { return localStorage.getItem(k); } catch { return null; } };
+
+let lang = le('hashLang') === 'java' ? 'java' : 'cs';
+let tec = ['reserva', 'rehash', 'lista'].includes(le('hashTec')) ? le('hashTec') : 'reserva';
+let T = null;
+let passos = [], k = 0, timer = null, codAtual = null, ultima = null;
+const NOME_TEC = { reserva: 'Hash direta com área de reserva', rehash: 'Hash direta com rehash', lista: 'Hash indireta com lista encadeada' };
+const EXEMPLO = { reserva: [5, 7, 14, 21, 19], rehash: [5, 7, 14, 21, 19, 1], lista: [5, 7, 14, 21, 19, 3] };
+const NOME_OP = { ins: 'inserir', pes: 'pesquisar', rem: 'remover' };
+const F = s => lang === 'cs' ? s[0].toUpperCase() + s.slice(1) : s;
+
+/* ---------------- código ---------------- */
+function mostraCodigo(linha, erro) {
+  const chave = lang + tec;
+  if (chave !== codAtual) {
+    $('cod').innerHTML = codigo(lang, tec).linhas.map((l, n) => `<div><span class="n">${n + 1}</span>${colore(l)}</div>`).join('');
+    $('codTit').textContent = 'Código: classe ' + { reserva: 'HashReserva', rehash: 'HashRehash', lista: 'HashLista (com Lista e Celula)' }[tec];
+    $('codLang').textContent = lang === 'cs' ? 'C#' : 'Java';
+    codAtual = chave;
+  }
+  const ds = $('cod').children;
+  for (let n = 0; n < ds.length; n++) ds[n].className = n === linha ? (erro ? 'at err' : 'at') : '';
+  const d = ds[linha];
+  if (d) { const p = $('cod'); p.scrollTo({ top: Math.max(0, d.offsetTop - p.clientHeight / 2), behavior: 'smooth' }); }
+}
+function mostraFonte() {
+  const f = fonte(lang, tec);
+  $('full').innerHTML = f.split('\n').map((l, n) => `<div><span class="n">${n + 1}</span>${colore(l)}</div>`).join('');
+  $('fullTit').textContent = `Código completo (${ARQ[lang][tec]})`;
+  $('copiado').textContent = '';
+}
+
+/* ---------------- desenho ---------------- */
+function cores() {
+  const css = getComputedStyle(document.documentElement), cor = v => css.getPropertyValue(v).trim();
+  return { lar: cor('--lar'), larcl: cor('--larcl'), verde: cor('--verde'), verdecl: cor('--verdecl'), verm: cor('--verm'), vermcl: cor('--vermcl'),
+    navy: cor('--navyink'), mute: cor('--mute'), ink: cor('--ink'), line: cor('--line'), card: cor('--card'), no: cor('--no'), noborda: cor('--noborda'), roxo: cor('--roxo') };
+}
+const Tx = (x, y, txt, o = '') => `<text x="${x}" y="${y}" ${o}>${esc(txt)}</text>`;
+const mono = 'font-family="JetBrains Mono,monospace"';
+const mk = (id, cor) => `<marker id="${id}" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="${cor}"/></marker>`;
+
+function desenhaDireta(p, C) {
+  const tab = p.est.tab, m = T.m, r = T.r, cw = 74, ch = 30, ox = 120, oy = 34, gap = 30;
+  const Y = q => oy + q * ch + (q >= m ? gap : 0);
+  let s = '';
+  // rótulos de áreas
+  const yFimT = Y(m - 1) + ch;
+  s += `<path d="M${ox + cw + 12} ${oy + 2}q8 0 8 8v${(yFimT - oy) / 2 - 14}q0 6 8 6q-8 0-8 6v${(yFimT - oy) / 2 - 14}q0 8-8 8" fill="none" stroke="${C.mute}" stroke-width="1.6"/>`;
+  s += Tx(ox + cw + 36, (oy + yFimT) / 2 + 4, `tabela (m = ${m})`, `font-size="13" fill="${C.mute}"`);
+  if (r) {
+    const y0 = Y(m), y1 = Y(m + r - 1) + ch;
+    s += `<path d="M${ox + cw + 12} ${y0 + 2}q8 0 8 8v${(y1 - y0) / 2 - 14}q0 6 8 6q-8 0-8 6v${(y1 - y0) / 2 - 14}q0 8-8 8" fill="none" stroke="${C.mute}" stroke-width="1.6"/>`;
+    s += Tx(ox + cw + 36, (y0 + y1) / 2 - 4, `área de reserva (${r})`, `font-size="13" fill="${C.mute}"`);
+    s += Tx(ox + cw + 36, (y0 + y1) / 2 + 13, `${lang === 'cs' ? '_numReserva' : 'numReserva'} = ${p.est.num}`, `${mono} font-size="12" fill="${C.ink}"`);
+  }
+  tab.forEach((v, q) => {
+    const y = Y(q), mc = p.marca[q], sonda = p.sonda && p.sonda.pos === q;
+    let fill = C.card, stroke = C.noborda, sw = 1.4, tc = C.ink, dash = '';
+    if (q >= m) fill = C.no;
+    if (sonda) { fill = C.larcl; stroke = C.lar; sw = 3; }
+    if (mc === 'novo') { fill = C.lar; stroke = '#a85a12'; tc = '#fff'; }
+    if (mc === 'achou') { fill = C.verde; stroke = '#1d5535'; tc = '#fff'; }
+    if (mc === 'vaga') { fill = C.vermcl; stroke = C.verm; dash = 'stroke-dasharray="5 3"'; }
+    if (sonda) sw = 3;
+    s += `<rect x="${ox}" y="${y}" width="${cw}" height="${ch}" fill="${fill}" stroke="${stroke}" stroke-width="${sw}" ${dash}/>`;
+    s += Tx(ox - 10, y + 20, q, `${mono} font-size="13" text-anchor="end" fill="${C.mute}"`);
+    if (v >= 0) s += Tx(ox + cw / 2, y + 20, v, `text-anchor="middle" font-weight="700" font-size="15" fill="${tc}"`);
+    else if (v === REMOVIDO) s += Tx(ox + cw / 2, y + 19, 'REMOVIDO', `${mono} text-anchor="middle" font-size="10.5" fill="${C.mute}" font-style="italic"`);
+  });
+  if (p.sonda) {
+    const y = Y(p.sonda.pos) + ch / 2, rot = p.sonda.rotulo;
+    const cor = rot === 'ocupado' ? C.verm : rot === 'livre' ? C.navy : rot === 'removido' ? C.roxo : C.lar;
+    s += `<path d="M${ox - 50} ${y}H${ox - 30}" stroke="${cor}" stroke-width="2.4" marker-end="url(#mS)"/>`;
+    if (rot) s += Tx(ox - 56, y + 5, rot, `text-anchor="end" font-size="14" font-weight="700" fill="${cor}"`);
+  }
+  if (p.cmpPos != null) {
+    const y = Y(p.cmpPos) + ch / 2;
+    s += Tx(ox + cw + 6, y + 5, `== ${ultimaX(p)} ?`, `${mono} font-size="12" font-weight="700" fill="${C.lar}"`);
+  }
+  if (p.seta) {
+    const [de, para] = p.seta, x = ox + cw + 4, y1 = Y(de) + ch / 2, y2 = Y(para) + ch / 2;
+    s += `<path d="M${x} ${y1}C${x + 70} ${y1} ${x + 70} ${y2} ${x + 4} ${y2}" fill="none" stroke="${C.verde}" stroke-width="2.6" marker-end="url(#mV)"/>`;
+  }
+  const W = ox + cw + 210, H = Y(tab.length - 1) + ch + 16;
+  return { s, W, H };
+}
+function ultimaX(p) { return p.x; }
+
+function desenhaLista(p, C) {
+  const m = T.m, listas = p.est.listas, ox = 70, oy = 30, rh = 46, cw = 46, pw = 22, gx = 30, cx0 = ox + 40 + 46;
+  const L = p.lst || null;
+  let s = '';
+  const X = q => cx0 + (q + 1) * (cw + pw + gx);     // q = -1 → cabeça
+  let W = 420;
+  listas.forEach((lst, k) => {
+    const y = oy + k * rh, ativa = L && L.k === k, sonda = p.sonda && p.sonda.pos === k;
+    s += Tx(ox - 10, y + 20, k, `${mono} font-size="13" text-anchor="end" fill="${C.mute}"`);
+    s += `<rect x="${ox}" y="${y}" width="40" height="30" fill="${sonda || ativa ? C.larcl : C.card}" stroke="${sonda || ativa ? C.lar : C.noborda}" stroke-width="${sonda || ativa ? 2.6 : 1.4}"/>`;
+    s += `<circle cx="${ox + 20}" cy="${y + 15}" r="3.5" fill="${C.navy}"/><path d="M${ox + 20} ${y + 15}H${X(-1) - 3}" stroke="${C.navy}" stroke-width="1.6" marker-end="url(#mN)"/>`;
+    const ult = ativa && L.ult != null ? L.ult : lst.length - 1;
+    for (let q = -1; q < lst.length; q++) {
+      const x = X(q);
+      let fill = q === -1 ? C.no : C.card, stroke = C.noborda, sw = 1.4, tc = C.ink;
+      if (ativa && L.novo === q) { fill = C.lar; stroke = '#a85a12'; tc = '#fff'; }
+      if (ativa && L.achou === q) { fill = C.verde; stroke = '#1d5535'; tc = '#fff'; }
+      if (ativa && L.alvo === q) { fill = C.vermcl; stroke = C.verm; sw = 2.6; }
+      if (ativa && L.i === q && L.alvo !== q && L.novo !== q && L.achou !== q) { stroke = C.lar; sw = 2.6; fill = q === -1 ? C.no : C.larcl; }
+      s += `<rect x="${x}" y="${y}" width="${cw}" height="30" fill="${fill}" stroke="${stroke}" stroke-width="${sw}"/><rect x="${x + cw}" y="${y}" width="${pw}" height="30" fill="${fill}" stroke="${stroke}" stroke-width="${sw}"/>`;
+      s += q === -1 ? Tx(x + cw / 2, y + 19, 'cabeça', `text-anchor="middle" font-size="10.5" fill="${C.mute}" font-style="italic"`) : Tx(x + cw / 2, y + 20, lst[q], `text-anchor="middle" font-weight="700" font-size="15" fill="${tc}"`);
+      s += `<circle cx="${x + cw + pw / 2}" cy="${y + 15}" r="3" fill="${C.navy}"/>`;
+      if (q < lst.length - 1) s += `<path d="M${x + cw + pw / 2} ${y + 15}H${X(q + 1) - 3}" stroke="${C.navy}" stroke-width="1.6" marker-end="url(#mN)"/>`;
+      else { const ex = x + cw + pw / 2; s += `<path d="M${ex} ${y + 15}h16v8m-7 0h14m-10 4h6" fill="none" stroke="${C.navy}" stroke-width="1.6"/>`; }
+      if (ativa && q === ult && lst.length) s += Tx(x + (cw + pw) / 2, y + 42, lang === 'cs' ? '_ultimo' : 'ultimo', `${mono} text-anchor="middle" font-size="10.5" fill="${C.roxo}" font-weight="700"`);
+      if (ativa && L.i === q) {
+        s += `<path d="M${x + cw / 2} ${y - 13}V${y - 3}" stroke="${C.lar}" stroke-width="2.4" marker-end="url(#mS)"/>` + Tx(x + cw / 2 + 9, y - 6, 'i', `${mono} font-size="12" font-weight="700" fill="${C.lar}"`);
+      }
+    }
+    W = Math.max(W, X(lst.length - 1) + cw + pw + 40);
+  });
+  const H = oy + m * rh + 10;
+  return { s, W, H };
+}
+function desenha(p) {
+  const C = cores(), svg = $('svg');
+  const r = tec === 'lista' ? desenhaLista(p, C) : desenhaDireta(p, C);
+  const cw = svg.clientWidth || 600;
+  const esc_ = Math.min(1.25, cw / r.W);
+  svg.parentNode.style.height = Math.max(260, Math.min(760, r.H * esc_ + 6)) + 'px';
+  svg.setAttribute('viewBox', `0 0 ${r.W} ${r.H}`);
+  svg.innerHTML = `<defs>${mk('mS', C.lar)}${mk('mN', C.navy)}${mk('mV', C.verde)}</defs><g font-family="Source Sans 3,sans-serif">${r.s}</g>`;
+}
+
+/* ---------------- painel ---------------- */
+function mostra() {
+  const p = passos[k];
+  if (!p) return;
+  mostraCodigo(p.linha, p.erro);
+  desenha(p);
+  $('nota').innerHTML = p.nota;
+  $('nota').className = 'nota' + (p.erro ? ' err' : '');
+  $('res').innerHTML = p.resultado !== undefined && p.fimOp ? `Resultado de ${esc(p.opTxt)}: <b>${esc(p.resultado)}</b>` : '';
+  $('pilha').innerHTML = p.pilha.map((f, q) => `<div class="fr${q === p.pilha.length - 1 ? ' top' : ''}"><span class="nm">${esc(f.nome)}</span>${f.vars.map(v => `<span>${esc(v[0])} <span class="vv">${esc(v[1])}</span></span>`).join('')}${f.aguarda ? `<span class="ag">aguarda → ${esc(f.aguarda)}</span>` : ''}</div>`).join('');
+  const n = p.est.listas ? p.est.listas.reduce((a, l) => a + l.length, 0) : p.est.tab.filter(v => v >= 0).length;
+  const alfa = (n / T.m).toFixed(2).replace('.', ',');
+  $('stats').innerHTML = `<span>n = <b>${n}</b></span><span>m = <b>${T.m}</b></span><span>fator de carga α = n/m = <b>${alfa}</b></span>` +
+    (p.opTxt ? `<span class="cmp">comparações com x em ${esc(p.opTxt)}: <b>${p.cmp}</b></span>` : '');
+  $('info2').textContent = p.opTxt || '';
+  $('pBar').max = passos.length - 1; $('pBar').value = k;
+  $('pCont').textContent = `${k + 1}/${passos.length}`;
+  $('pAnt').disabled = $('pIni').disabled = k === 0;
+  $('pPro').disabled = $('pFim').disabled = k === passos.length - 1;
+  rotulo();
+}
+const manual = () => $('modo').value === 'manual';
+function rotulo() { $('pPlay').textContent = manual() ? '▶ Executar passo' : timer ? '⏸ Pausar' : '▶ Executar'; $('pPlay').disabled = manual() && k >= passos.length - 1; $('vel').disabled = manual(); }
+function para() { clearInterval(timer); timer = null; rotulo(); }
+function toca() {
+  if (k >= passos.length - 1) k = 0;
+  timer = setInterval(() => { if (k < passos.length - 1) { k++; mostra(); } else para(); }, +$('vel').value);
+  rotulo();
+}
+function log(t, e) { const s = document.createElement('span'); s.textContent = t; if (e) s.className = 'e'; $('log').prepend(s); while ($('log').children.length > 16) $('log').lastChild.remove(); }
+function estado(nota) {
+  ultima = null; para();
+  passos = [{ linha: -1, nota, est: T.snap(), cmp: 0, marca: {}, pilha: [] }]; k = 0; mostra();
+}
+function valores() {
+  const v = $('val').value.trim().split(/[\s,;]+/).filter(Boolean).map(Number);
+  if (!v.length || v.some(x => !Number.isInteger(x) || x < 0 || x > 999)) { estado('Digite chaves <b>inteiras de 0 a 999</b> (os valores negativos são usados pelo código como marcas: NULO = −1' + (tec === 'rehash' ? ', REMOVIDO = −2' : '') + ').'); return null; }
+  return v;
+}
+
+/* ---------------- operações ---------------- */
+function gera(tipo, xs) {
+  const todos = [], rot = [];
+  for (const x of xs) {
+    const ps = trace(T, lang, tipo, x);
+    const opTxt = `${F(NOME_OP[tipo])}(${x})`;
+    ps.forEach(p => { p.opTxt = opTxt; p.x = x; });
+    ps[ps.length - 1].fimOp = true;
+    const fim = ps[ps.length - 1];
+    rot.push(opTxt + (tipo === 'pes' ? ' = ' + fim.resultado + ` (${fim.cmp} comp.)` : fim.erro || ps.some(q => q.erro) ? ' ✗' : ''));
+    todos.push(...ps);
+  }
+  return { todos, rot, erro: todos.some(q => q.erro) };
+}
+function op(tipo, xs, inicio) {
+  xs = xs || valores(); if (!xs) return;
+  const antes = T.snap();
+  const { todos, rot, erro } = gera(tipo, xs);
+  ultima = { tipo, xs, antes };
+  para(); passos = todos; k = inicio != null ? inicio : $('passo').checked ? 0 : todos.length - 1; mostra();
+  rot.forEach(r => log(r, r.endsWith('✗')));
+  if (inicio == null && $('passo').checked && todos.length > 1 && !manual()) toca();
+}
+function novaTabela(manter) {
+  const vals = manter && T ? (T.tec === 'lista' ? T.listas.flat() : T.tab.filter(v => v >= 0)) : [];
+  T = new Tabela(tec, +$('tam').value, +$('resv').value);
+  const fora = [];
+  for (const x of vals) { try { T.inserir(x); } catch { fora.push(x); } }
+  return fora;
+}
+function ajustaTec() {
+  $('tec').value = tec;
+  $('grpRes').style.display = tec === 'reserva' ? 'contents' : 'none';
+  $('figTit').textContent = { reserva: 'Tabela e área de reserva', rehash: 'Tabela', lista: 'Tabela de listas' }[tec];
+  $('dicaval').innerHTML = 'Chaves inteiras de 0 a 999. Vários valores separados por espaço ou vírgula (ex.: 5 7 14) são executados um depois do outro, com passo a passo. ' +
+    (tec === 'rehash' ? 'Funções: <code>hash(x) = x % m</code> e <code>rehash(x) = (x + 1) % m</code>, com uma única tentativa de rehash, como nos slides.' : 'Função de transformação: <code>hash(x) = x % m</code>.');
+  mostraFonte();
+}
+function exemplo() {
+  $('tam').value = 7; $('resv').value = 3;
+  novaTabela(false);
+  const seq = EXEMPLO[tec];
+  $('val').value = seq.join(' ');
+  log('Exemplo dos slides (' + NOME_TEC[tec].toLowerCase() + ')', false);
+  op('ins', seq, 0);
+  $('nota').innerHTML = `Exemplo dos slides: tabela de tamanho 7${tec === 'reserva' ? ' com área de reserva 3' : ''}, inserindo ${seq.join(', ')}. Clique em <b>Executar</b>. ` +
+    (tec === 'lista' ? '' : 'Depois, faça o exercício dos slides: quantas comparações são necessárias para pesquisar o 5, o 21, o 19 e o 6? Use <b>Pesquisar</b> e confira o contador.');
+}
+
+$('tec').onchange = () => { tec = $('tec').value; guarda('hashTec', tec); codAtual = null; ajustaTec(); exemplo(); };
+$('tam').onchange = $('resv').onchange = () => {
+  const fora = novaTabela(true);
+  estado(`Tabela refeita com m = ${T.m}${tec === 'reserva' ? ` e área de reserva ${T.r}` : ''}: os elementos foram reinseridos nas novas posições.` + (fora.length ? ` Não couberam: ${fora.join(', ')}.` : ''));
+};
+document.querySelectorAll('#langs button').forEach(bt => bt.onclick = () => {
+  lang = bt.dataset.l; guarda('hashLang', lang);
+  document.querySelectorAll('#langs button').forEach(q => q.setAttribute('aria-pressed', q.dataset.l === lang));
+  mostraFonte();
+  if (ultima) {
+    const fimAntes = k === passos.length - 1, kk = k;
+    T.restaura(ultima.antes);
+    const { todos } = gera(ultima.tipo, ultima.xs);
+    para(); passos = todos; k = fimAntes ? todos.length - 1 : Math.min(kk, todos.length - 1); mostra();
+  } else { codAtual = null; mostra(); }
+});
+$('bIns').onclick = () => op('ins'); $('bPes').onclick = () => op('pes'); $('bRem').onclick = () => op('rem');
+$('bEx').onclick = exemplo;
+$('bAle').onclick = () => {
+  novaTabela(false);
+  const cap = tec === 'lista' ? T.m + 3 : tec === 'reserva' ? T.m - 1 : Math.ceil(T.m * 0.6);
+  const s = new Set(); let tent = 0;
+  while (s.size < cap && tent++ < 500) { const x = Math.floor(Math.random() * 100); if (s.has(x)) continue; try { T.inserir(x); s.add(x); } catch {} }
+  estado(`Tabela aleatória: inseridos ${[...s].join(', ')}, sem passo a passo.`); log('Tabela aleatória', false);
+};
+$('bLim').onclick = () => { novaTabela(false); estado('Tabela vazia. Insira valores ou carregue o exemplo dos slides.'); log('Tabela vazia', false); };
+$('val').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); op('ins'); } });
+$('pPlay').onclick = () => { if (manual()) { if (k < passos.length - 1) { k++; mostra(); } } else timer ? para() : toca(); };
+$('modo').onchange = () => { para(); guarda('hashModo', $('modo').value); };
+{ const mm = le('hashModo'); if (mm === 'manual' || mm === 'auto') $('modo').value = mm; }
+$('pAnt').onclick = () => { para(); if (k > 0) { k--; mostra(); } };
+$('pPro').onclick = () => { para(); if (k < passos.length - 1) { k++; mostra(); } };
+$('pIni').onclick = () => { para(); k = 0; mostra(); };
+$('pFim').onclick = () => { para(); k = passos.length - 1; mostra(); };
+$('pBar').oninput = e => { para(); k = +e.target.value; mostra(); };
+$('vel').onchange = () => { if (timer) { para(); toca(); } };
+document.addEventListener('keydown', e => {
+  if (e.target.tagName === 'INPUT' && e.target.type === 'text') return;
+  if (e.key === 'ArrowRight') { e.preventDefault(); $('pPro').click(); }
+  else if (e.key === 'ArrowLeft') { e.preventDefault(); $('pAnt').click(); }
+  else if (e.key === ' ' && e.target.tagName !== 'BUTTON' && e.target.tagName !== 'SELECT') { e.preventDefault(); $('pPlay').click(); }
+});
+{ let lw = -1; new ResizeObserver(en => { const w = Math.round(en[0].contentRect.width); if (w === lw) return; lw = w; requestAnimationFrame(() => { passos[k] && desenha(passos[k]); }); }).observe($('svg')); }
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => passos[k] && desenha(passos[k]));
+$('bCopia').onclick = async () => { try { await navigator.clipboard.writeText(fonte(lang, tec)); $('copiado').textContent = 'Copiado.'; } catch { $('copiado').textContent = 'Não foi possível copiar; selecione o texto abaixo.'; } };
+
+document.querySelectorAll('#langs button').forEach(q => q.setAttribute('aria-pressed', q.dataset.l === lang));
+ajustaTec();
+exemplo();
+}
+
+</script>
+</body>
+</html>

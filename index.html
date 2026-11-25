@@ -77,6 +77,13 @@ const SIMULADORES = [
     arquivo: 'simulador-avl.html',
     tags: ['árvores balanceadas', 'C · C++ · Java · C#', 'rotações'],
     figura: 'avl'
+  },
+  {
+    titulo: 'Tabela Hash',
+    descricao: 'As técnicas de tratamento de colisões da Unidade VII: hash direta com área de reserva, hash direta com rehash e hash indireta com lista encadeada, em C# ou Java. Mostra a posição examinada (livre ou ocupada), o contador de comparações com x, o fator de carga e os exemplos dos slides prontos para executar.',
+    arquivo: 'simulador-hash.html',
+    tags: ['Unidade VII', 'C# · Java', 'colisões'],
+    figura: 'hash'
   }
 ];
 
@@ -124,6 +131,19 @@ const FIGURAS = {
       <rect x="84" y="12" width="24" height="16" rx="8" fill="var(--verm, #b3261e)"/><text x="96" y="24" text-anchor="middle" fill="#fff">+2</text>
       <text x="138" y="50" text-anchor="middle" fill="var(--verde, #2e7d4f)">rotação</text>
     </g>
+  </svg>`,
+  hash: `<svg viewBox="0 0 280 150" role="img" aria-label="Tabela hash com área de reserva e uma lista encadeada">
+    <defs><marker id="hm" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0L10 5L0 10z" fill="var(--noborda)"/></marker><marker id="hl" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M0 0L10 5L0 10z" fill="var(--lar)"/></marker></defs>
+    <g font-family="JetBrains Mono,monospace" font-size="11" fill="var(--mute)" text-anchor="end">${[0,1,2,3,4,5,6].map(k=>`<text x="54" y="${20+k*17}">${k}</text>`).join('')}</g>
+    ${[['7',''],['',''],['',''],['',''],['',''],['5','o'],['','']].map(([v,e],k)=>`<rect x="60" y="${8+k*17}" width="44" height="17" fill="${e?'var(--larcl)':'var(--card)'}" stroke="${e?'var(--lar)':'var(--noborda)'}" stroke-width="${e?2.4:1.4}"/>
+      <text x="82" y="${21+k*17}" text-anchor="middle" font-family="Source Sans 3,sans-serif" font-weight="700" font-size="12" fill="var(--ink)">${v}</text>`).join('')}
+    <path d="M6 101h30" stroke="var(--lar)" stroke-width="2.4" marker-end="url(#hl)"/><text x="4" y="93" font-family="Source Sans 3,sans-serif" font-weight="700" font-size="10.5" fill="var(--verm, #b3261e)">ocupado</text>
+    <g font-family="Source Sans 3,sans-serif" font-weight="700" font-size="12" text-anchor="middle">
+      ${[['14',0],['21',1],['19',2]].map(([v,k])=>`<rect x="${130+k*50}" y="8" width="34" height="17" fill="var(--no)" stroke="var(--noborda)" stroke-width="1.4"/><text x="${147+k*50}" y="21" fill="var(--ink)">${v}</text>`).join('')}
+    </g>
+    <path d="M104 16H126" stroke="var(--noborda)" stroke-width="1.6" marker-end="url(#hm)"/><path d="M164 16H176" stroke="var(--noborda)" stroke-width="1.6" marker-end="url(#hm)"/><path d="M214 16H226" stroke="var(--noborda)" stroke-width="1.6" marker-end="url(#hm)"/>
+    <text x="196" y="52" text-anchor="middle" font-family="Source Sans 3,sans-serif" font-size="11.5" fill="var(--mute)">colisões encadeadas</text>
+    <text x="196" y="110" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="13" font-weight="700" fill="var(--navyink, #0b2d5b)">h(x) = x % 7</text>
   </svg>`,
   quick: `<svg viewBox="0 0 280 150" role="img" aria-label="Barras de um vetor sendo ordenado, com o pivô">
     <line x1="18" y1="62" x2="262" y2="62" stroke="var(--gold)" stroke-width="2" stroke-dasharray="6 4"/>
