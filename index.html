@@ -51,6 +51,13 @@ footer{max-width:1100px;margin:auto;padding:0 max(5vw,18px) 32px;color:var(--mut
 // "arquivo" é o caminho do .html em relação a este main.html.
 const SIMULADORES = [
   {
+    titulo: 'Memória e CPU: variáveis por dentro',
+    descricao: 'O que acontece quando uma variável é declarada e recebe um valor, em C, C++, Java ou C#: a memória byte a byte com os endereços, cada variável contornada sobre os seus bytes, alinhamento, lixo de memória, little/big-endian, e a CPU buscando valores e literais nos registradores, calculando na ULA e devolvendo o resultado para a memória ou para a saída. Valores em binário, decimal ou hexadecimal; exemplos prontos (overflow, divisão inteira, conversões, complemento de dois) e editor para escrever o seu programa.',
+    arquivo: 'simulador-memoria.html',
+    tags: ['introdução à programação', 'C · C++ · Java · C#', 'memória e CPU'],
+    figura: 'memoria'
+  },
+  {
     titulo: 'Árvore Binária de Pesquisa',
     descricao: 'Inserção, pesquisa, remoção, caminhamentos, mínimo e máximo, com o código da classe ArvoreBinaria, a pilha de execução e as referências desenhadas.',
     arquivo: 'simulador-abp.html',
@@ -88,6 +95,23 @@ const SIMULADORES = [
 ];
 
 const FIGURAS = {
+  memoria: `<svg viewBox="0 0 280 150" role="img" aria-label="Bytes da memória com uma variável int de 4 bytes e a ULA da CPU">
+    <defs><marker id="mm" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0L10 5L0 10z" fill="var(--lar)"/></marker></defs>
+    <g font-family="JetBrains Mono,monospace" text-anchor="middle">
+      ${['05','00','00','00','2A','··','··','··'].map((v,k)=>`<rect x="${14+k*32}" y="96" width="28" height="32" rx="4" fill="${k<4?'var(--no)':'var(--card)'}" stroke="var(--noborda)" stroke-width="1.4"/>
+        <text x="${28+k*32}" y="107" font-size="7.5" fill="var(--mute)">${(4096+k).toString(16).toUpperCase()}</text>
+        <text x="${28+k*32}" y="123" font-size="12" font-weight="700" fill="${k<5?'var(--ink)':'var(--mute)'}">${v}</text>`).join('')}
+    </g>
+    <rect x="11" y="93" width="130" height="38" rx="7" fill="none" stroke="var(--lar)" stroke-width="2.6"/>
+    <rect x="11" y="78" width="50" height="15" rx="4" fill="var(--lar)"/><text x="36" y="89" text-anchor="middle" font-family="Source Sans 3,sans-serif" font-weight="700" font-size="11" fill="#fff">a : int</text>
+    <path d="M160 14h28l6 10 6-10h28l-10 42h-48z" fill="var(--navyink)"/>
+    <text x="194" y="47" text-anchor="middle" font-family="Source Sans 3,sans-serif" font-weight="700" font-size="13" fill="var(--card)">ULA</text>
+    <rect x="16" y="18" width="62" height="24" rx="5" fill="var(--card)" stroke="var(--noborda)" stroke-width="1.4"/>
+    <text x="47" y="35" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="12" fill="var(--ink)">R0 = 5</text>
+    <path d="M70 92Q60 66 52 46" fill="none" stroke="var(--lar)" stroke-width="2.4" marker-end="url(#mm)"/>
+    <path d="M80 30H150" fill="none" stroke="var(--lar)" stroke-width="2.4" marker-end="url(#mm)"/>
+    <text x="96" y="66" font-family="JetBrains Mono,monospace" font-size="10.5" font-weight="700" fill="var(--lar)">LOAD</text>
+  </svg>`,
   abp: `<svg viewBox="0 0 280 150" role="img" aria-label="Desenho de uma árvore binária de pesquisa">
     <g stroke="var(--noborda)" stroke-width="2">
       <line x1="140" y1="28" x2="80" y2="72"/><line x1="140" y1="28" x2="200" y2="72"/>

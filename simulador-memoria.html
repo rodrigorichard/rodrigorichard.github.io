@@ -1,0 +1,989 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Simulador de Memória e CPU</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500;600&display=swap">
+<style>
+/* VOICE: instrumento de bancada, claro e didático, para projetar em sala de aula.
+   IDEA: um painel de medição que deixa ver a máquina por dentro — código, CPU e memória lado a lado.
+   PICTURE: a grade de bytes da memória com variáveis contornadas e valores voando entre memória, registradores e ULA.
+   COLOUR and TYPE: alumínio #e9eaec, preto, ponteiro laranja #ff4f00; noite #141517. Geist + Geist Mono.
+   LAYOUT: barra de escolhas no topo; código | CPU+saída | memória; controles fixos embaixo. */
+:root{color-scheme:light dark;--bg:light-dark(#e9eaec,#141517);--pan:light-dark(#f7f7f8,#1c1e21);--ink:light-dark(#111214,#ececee);--mute:light-dark(#62666d,#9da1a8);--line:light-dark(#cdd0d4,#30333a);--acc:#ff4f00;--accs:light-dark(#ffe6da,#43210f);--code:light-dark(#ffffff,#17181a);--bad:light-dark(#c4271f,#ff7b72);--ok:light-dark(#1d7a46,#5ad08a)}
+:root[data-theme=light]{color-scheme:light}:root[data-theme=dark]{color-scheme:dark}
+*{box-sizing:border-box;min-width:0}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 Geist,system-ui,sans-serif;overflow-x:clip}
+code,pre,.mono{font-family:"Geist Mono",ui-monospace,Menlo,Consolas,monospace}
+button,select{font:inherit;color:inherit}
+:focus-visible{outline:3px solid var(--acc);outline-offset:2px}
+.top{display:flex;flex-wrap:wrap;gap:14px 28px;align-items:end;justify-content:space-between;padding:18px max(3vw,16px) 14px}
+h1{font-size:32px;line-height:1.05;margin:0;font-weight:600;letter-spacing:-.01em;text-wrap:balance}
+.top p{margin:6px 0 0;color:var(--mute);max-width:60ch}
+.tools{display:flex;flex-wrap:wrap;gap:10px 14px;align-items:end}
+.fld{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--mute)}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--pan)}
+.seg button{min-height:42px;padding:0 14px;border:0;border-right:1px solid var(--line);background:none;cursor:pointer;font-weight:500}
+.seg button:last-child{border-right:0}
+.seg button[aria-pressed=true]{background:var(--ink);color:var(--bg)}
+select{min-height:42px;border:1px solid var(--line);border-radius:10px;background:var(--pan);padding:0 10px;font-size:16px;max-width:300px}
+.btn{min-height:42px;border:1px solid var(--line);border-radius:10px;background:var(--pan);padding:0 16px;cursor:pointer;font-weight:500}
+.btn.pri{background:var(--acc);border-color:var(--acc);color:#fff}
+main{display:grid;gap:14px;padding:0 max(3vw,16px) 100px;grid-template-columns:minmax(0,1fr);align-items:start}
+@media(min-width:820px){main{grid-template-columns:minmax(0,1.1fr) minmax(0,.9fr)}#memP{grid-column:1/-1}}
+@media(min-width:1320px){main{grid-template-columns:minmax(0,.95fr) minmax(0,.6fr) minmax(0,1.3fr)}#memP{grid-column:auto}}
+.pan{background:var(--pan);border:1px solid var(--line);border-radius:14px;padding:14px}
+.pan h2{font-size:14px;font-weight:600;margin:0 0 10px;display:flex;justify-content:space-between;gap:8px;align-items:baseline}
+.pan h2 small{font-weight:400;color:var(--mute);font-size:13px}
+.col{display:flex;flex-direction:column;gap:14px}
+/* código */
+#code{background:var(--code);border:1px solid var(--line);border-radius:10px;padding:8px 0;font:14.5px/1.65 "Geist Mono",monospace;max-height:56vh;overflow:auto}
+.cl{display:flex;white-space:pre;padding-right:12px;border-left:4px solid transparent}
+.cl .ln{width:3.2em;flex:none;text-align:right;padding-right:12px;color:var(--mute);user-select:none;opacity:.7}
+.cl.cur{background:var(--accs);border-left-color:var(--acc)}
+.cl.cur .ln{color:var(--acc);opacity:1;font-weight:600}
+.cl.err{background:light-dark(#fde3e1,#3b1513);text-decoration:underline wavy var(--bad);text-underline-offset:4px}
+.t-ty{color:light-dark(#0b5cd5,#79b8ff)}.t-kw{color:light-dark(#a3207a,#f08ad0)}.t-st{color:light-dark(#18794e,#7ee2a8)}
+.t-nu{color:light-dark(#b45309,#ffb169)}.t-cm{color:var(--mute);font-style:italic}.t-pp{color:light-dark(#0e7490,#5ccfe6)}.t-fn{color:light-dark(#5b3fc4,#b9a6ff)}
+#explain{min-height:120px}
+#explain .ttl{font-weight:600;margin-bottom:4px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+#explain p{margin:0;max-width:70ch}
+#explain code{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:0 4px;font-size:14px}
+.tag{font-size:13px;font-weight:500;border-radius:6px;padding:1px 8px;background:var(--ink);color:var(--bg)}
+.msgs{display:flex;flex-direction:column;gap:8px;margin-top:10px}
+.msg{border-radius:10px;padding:10px 12px;font-size:14.5px;border:1px solid}
+.msg pre{margin:6px 0 0;white-space:pre-wrap;font-size:13px}
+.msg.e{border-color:var(--bad);background:light-dark(#fdecea,#2e1412)}
+.msg.w{border-color:#d08700;background:light-dark(#fff6dc,#2c230d)}
+/* CPU */
+#cpu{display:flex;flex-direction:column;gap:12px}
+.regs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.reg{border:1px solid var(--line);border-radius:10px;padding:8px 10px;background:var(--code);min-height:64px;transition:box-shadow .3s}
+.reg .rn{display:flex;justify-content:space-between;font-size:13px;color:var(--mute)}
+.reg .rn b{color:var(--ink)}
+.reg .rv{font:500 15px/1.3 "Geist Mono",monospace;overflow-wrap:anywhere;margin-top:2px}
+.reg.empty .rv{color:var(--mute)}
+#alu{display:grid;grid-template-columns:96px minmax(0,1fr);gap:12px;align-items:center}
+.alu-shape{height:76px;background:var(--ink);color:var(--bg);clip-path:polygon(0 0,38% 0,50% 22%,62% 0,100% 0,78% 100%,22% 100%);display:grid;place-items:end center;padding-bottom:12px;font-weight:600;font-size:15px}
+.alu-txt{font:500 15px/1.4 "Geist Mono",monospace;overflow-wrap:anywhere}
+.alu-txt small{display:block;font-family:Geist,sans-serif;color:var(--mute);font-size:13px}
+.ir{border-top:1px dashed var(--line);padding-top:10px;font-size:13px;color:var(--mute)}
+.ir code{display:block;color:var(--ink);font-size:14.5px;white-space:pre-wrap;margin:2px 0 6px}
+.ir code.nx{color:var(--mute)}
+#out{background:#0f1011;color:#e8e8e8;border-radius:10px;padding:12px;min-height:110px;max-height:240px;overflow:auto;font:14.5px/1.5 "Geist Mono",monospace;white-space:pre-wrap;margin:0}
+#out .cur{display:inline-block;width:.6em;height:1.1em;background:var(--acc);vertical-align:text-bottom;animation:bl 1s steps(1) infinite}
+@keyframes bl{50%{opacity:0}}
+/* memória */
+.legend{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:13px;color:var(--mute);margin-bottom:8px}
+.legend i{display:inline-block;width:14px;height:14px;border-radius:3px;vertical-align:-2px;margin-right:5px;border:1px solid var(--line)}
+#mem{overflow-x:auto;padding-bottom:4px}
+.mrow{display:flex;align-items:flex-end;padding-top:22px}
+.maddr{width:64px;flex:none;font:500 13px "Geist Mono",monospace;color:var(--mute);padding-bottom:16px}
+.cells{display:flex}
+.cell{--w:44px;width:var(--w);flex:none;margin:3px;height:50px;border:1px solid var(--line);border-radius:6px;background:var(--code);display:flex;flex-direction:column;align-items:center;justify-content:center;position:relative}
+.b-bin .cell{--w:52px;height:66px}.b-dec .cell{--w:44px}
+.cell small{font:11px "Geist Mono",monospace;color:var(--mute);line-height:1}
+.cell b{font:500 15px/1.3 "Geist Mono",monospace}
+.b-bin .cell b{font-size:13px;line-height:1.2;text-align:center}
+.cell.free b{color:var(--mute);opacity:.5}
+.cell.junk b{color:var(--bad)}
+.cell.unk b{color:var(--mute)}
+.cell.pad{background:repeating-linear-gradient(135deg,transparent 0 5px,light-dark(#d5d7db,#33363c) 5px 7px)}
+.vb{display:flex;position:relative;border-radius:9px;box-shadow:0 0 0 2.5px var(--c);background:color-mix(in srgb,var(--c) 16%,transparent);margin:0 1px}
+.vb .cell{border-color:color-mix(in srgb,var(--c) 45%,var(--line))}
+.vlab{position:absolute;left:0;bottom:100%;margin-bottom:3px;font-size:13px;font-weight:600;white-space:nowrap;background:var(--c);color:#fff;border-radius:6px 6px 6px 0;padding:0 7px;line-height:18px;z-index:1}
+.vlab em{font-style:normal;font-weight:400;opacity:.9;margin-left:5px}
+.vb.appear{animation:ap .7s ease-out}
+@keyframes ap{from{box-shadow:0 0 0 10px color-mix(in srgb,var(--c) 0%,transparent)}}
+.flash{animation:fl 1.1s ease-out}
+@keyframes fl{0%,30%{background:var(--acc);color:#fff}}
+.reg.flash .rv,.cell.flash b{color:inherit}
+table{border-collapse:collapse;width:100%;font-size:14.5px;margin-top:14px}
+th{text-align:left;font-weight:500;color:var(--mute);font-size:13px;border-bottom:1px solid var(--line);padding:4px 8px}
+td{padding:6px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+td.n{white-space:nowrap}td.n:last-child{white-space:normal}td.n{font-family:"Geist Mono",monospace;overflow-wrap:anywhere}
+td .dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px}
+.empty-note{color:var(--mute);font-size:14.5px;padding:8px 0}
+details{font-size:14.5px;color:var(--mute);margin-top:10px}
+details summary{cursor:pointer;color:var(--ink);font-weight:500;min-height:32px}
+details li{margin:3px 0}
+/* controles */
+.ctl{position:fixed;left:0;right:0;margin:0 auto;width:max-content;bottom:12px;display:flex;gap:8px;align-items:center;background:var(--ink);color:var(--bg);border-radius:16px;padding:8px 10px;box-shadow:0 10px 30px rgba(0,0,0,.25);z-index:20;max-width:calc(100vw - 16px);flex-wrap:wrap;justify-content:center}
+.ctl button{min-width:44px;min-height:44px;border:0;border-radius:10px;background:transparent;color:inherit;cursor:pointer;font-weight:500;padding:0 12px;display:flex;align-items:center;gap:6px}
+.ctl button:hover:not(:disabled){background:color-mix(in srgb,var(--bg) 14%,transparent)}
+.ctl button.go{background:var(--acc);color:#fff}
+.ctl button:disabled{opacity:.35;cursor:default}
+.ctl svg{width:18px;height:18px;fill:currentColor}
+.ctl .cnt{font:500 14px "Geist Mono",monospace;padding:0 8px;min-width:8.5em;text-align:center}
+.ctl label{display:flex;align-items:center;gap:6px;font-size:13px;padding:0 6px}
+.ctl input{accent-color:var(--acc);width:90px}
+.chip{position:fixed;left:0;top:0;z-index:50;pointer-events:none;background:var(--ink);color:var(--bg);font:600 15px "Geist Mono",monospace;padding:4px 10px;border-radius:8px;box-shadow:0 6px 18px rgba(0,0,0,.3);max-width:320px;overflow-wrap:anywhere;border:2px solid var(--cc,var(--acc))}
+.pulse{animation:pu .6s ease-in-out 2}
+@keyframes pu{50%{box-shadow:0 0 0 4px var(--acc)}}
+/* editor */
+.ov{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;align-items:center;justify-content:center;z-index:60;padding:16px}
+.ov.on{display:flex}
+.dlg{background:var(--pan);border-radius:16px;max-width:980px;width:100%;max-height:92vh;overflow:auto;padding:20px;display:grid;gap:16px;grid-template-columns:minmax(0,1fr)}
+@media(min-width:820px){.dlg{grid-template-columns:minmax(0,1.3fr) minmax(0,1fr)}}
+.dlg h3{margin:0 0 8px;font-size:20px}
+.dlg textarea{width:100%;min-height:360px;font:15px/1.6 "Geist Mono",monospace;background:var(--code);color:var(--ink);border:1px solid var(--line);border-radius:10px;padding:10px;resize:vertical;tab-size:4}
+.dlg .help{font-size:14.5px}
+.dlg .help code{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:0 4px;font-size:13.5px}
+.dlg .help ul{padding-left:18px;margin:6px 0}
+.row{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px}
+#perr{color:var(--bad);font-size:14.5px;margin-top:8px;min-height:1.2em}
+@media(prefers-reduced-motion:reduce){.flash,.vb.appear,.pulse{animation:none}}
+@media(max-width:600px){table{font-size:13px}.stack thead{display:none}.stack tr{display:grid;padding-block:10px}.stack td{display:flow-root;border:0;padding:3px 0;padding-inline-start:7em;text-align:start;white-space:normal}.stack td::before{content:attr(data-l);float:inline-start;width:6.5em;margin-inline-start:-7em;color:var(--mute)}h1{font-size:26px}.ctl .lbl{display:none}.maddr{width:52px;font-size:11px}}
+</style>
+<script>new MutationObserver(()=>{for(const c of document.querySelectorAll('.stack td:not([data-l])')){let i=0,p=c;while(p=p.previousElementSibling)i+=p.colSpan;c.dataset.l=c.closest('table').rows[0].cells[i]?.textContent||''}}).observe(document,{childList:true,subtree:true})</script>
+</head>
+<body>
+<header class="top">
+  <div>
+    <h1>Dentro do computador: memória e CPU</h1>
+    <p>Execute o programa passo a passo e veja cada variável ocupar bytes na memória e cada conta passar pela CPU.</p>
+  </div>
+  <div class="tools">
+    <label class="fld">Exemplo<select id="exSel"></select></label>
+    <div class="fld">Linguagem<div class="seg" id="langSeg"></div></div>
+    <div class="fld">Valores em<div class="seg" id="baseSeg"></div></div>
+    <label class="fld">Ordem dos bytes<select id="endSel"><option value="le">little-endian (x86, ARM)</option><option value="be">big-endian</option></select></label>
+    <button class="btn pri" id="editBtn">Editar programa</button>
+  </div>
+</header>
+
+<main>
+  <section class="col">
+    <div class="pan">
+      <h2>Programa completo <small id="langName"></small></h2>
+      <div id="code" role="region" aria-label="Código-fonte"></div>
+    </div>
+    <div class="pan" id="explain" aria-live="polite"></div>
+  </section>
+
+  <section class="col">
+    <div class="pan" id="cpu">
+      <h2>CPU <small>registradores e ULA</small></h2>
+      <div class="regs" id="regs"></div>
+      <div id="alu"><div class="alu-shape" id="aluShape">ULA</div><div class="alu-txt" id="aluTxt"></div></div>
+      <div class="ir">Instrução executada<code id="asmCur">—</code>Próxima<code class="nx" id="asmNext">—</code></div>
+    </div>
+    <div class="pan">
+      <h2>Saída <small>console</small></h2>
+      <pre id="out"></pre>
+    </div>
+  </section>
+
+  <section class="pan" id="memP">
+    <h2>Memória <small id="memInfo"></small></h2>
+    <div class="legend">
+      <span><i style="background:var(--code)"></i>byte livre</span>
+      <span><i style="background:var(--code);border-color:var(--bad)"></i><span style="color:var(--bad)">vermelho</span> = lixo de memória</span>
+      <span><i style="background:repeating-linear-gradient(135deg,transparent 0 3px,#bbb 3px 5px)"></i>padding (alinhamento)</span>
+      <span>cada célula = 1 byte, com seu endereço em cima</span>
+    </div>
+    <div id="mem"></div>
+    <div id="vtab"></div>
+    <details>
+      <summary>Sobre este modelo (simplificações)</summary>
+      <ul>
+        <li>Endereços fictícios a partir de 0x1000; as variáveis são colocadas em ordem crescente. Em máquinas reais a pilha costuma crescer para endereços menores e a ordem é escolhida pelo compilador.</li>
+        <li>Cada variável é alinhada a um endereço múltiplo do seu tamanho, como fazem os compiladores C/C++ em x86-64.</li>
+        <li>A CPU tem 4 registradores genéricos (R0–R3) e uma ULA. Uma CPU real tem mais registradores e o compilador pode otimizar, guardando variáveis só em registradores.</li>
+        <li>Em Java e C#, as variáveis locais ficam no quadro (frame) do método na pilha da máquina virtual; a visão byte a byte aqui é conceitual. Em Java/C#, <code>char</code> tem 2 bytes (UTF-16).</li>
+        <li>Saída de números reais: C usa <code>%f</code> (6 casas), C++ mostra até 6 algarismos significativos, Java e C# mostram a representação mais curta. Em C#, a cultura pt-BR do Windows usaria vírgula decimal; aqui usamos ponto.</li>
+      </ul>
+    </details>
+  </section>
+</main>
+
+<nav class="ctl" aria-label="Controles da execução">
+  <button id="bReset" title="Reiniciar (Home)"><svg viewBox="0 0 24 24"><path d="M6 5h2v14H6zM20 5v14L9 12z"/></svg><span class="lbl">Início</span></button>
+  <button id="bBack" title="Voltar um passo (←)"><svg viewBox="0 0 24 24"><path d="M17 5v14L6 12z"/></svg><span class="lbl">Voltar</span></button>
+  <span class="cnt" id="cnt">0 / 0</span>
+  <button id="bNext" class="go" title="Avançar um passo (→)"><svg viewBox="0 0 24 24"><path d="M7 5v14l11-7z"/></svg><span class="lbl">Avançar</span></button>
+  <button id="bPlay" title="Executar automaticamente (espaço)"><svg viewBox="0 0 24 24" id="playIco"><path d="M4 5v14l8-7zM12 5v14l8-7z"/></svg><span class="lbl" id="playLbl">Executar</span></button>
+  <button id="bEnd" title="Ir ao fim (End)"><svg viewBox="0 0 24 24"><path d="M4 5v14l11-7zM16 5h2v14h-2z"/></svg><span class="lbl">Fim</span></button>
+  <label>Velocidade<input type="range" id="spd" min="1" max="5" value="3" aria-label="Velocidade da animação"></label>
+</nav>
+
+<div class="ov" id="ov" role="dialog" aria-modal="true" aria-labelledby="dlgT">
+  <div class="dlg">
+    <div>
+      <h3 id="dlgT">Editar programa</h3>
+      <textarea id="ed" spellcheck="false" aria-label="Corpo do programa"></textarea>
+      <div id="perr"></div>
+      <div class="row"><button class="btn pri" id="edOk">Aplicar</button><button class="btn" id="edCancel">Cancelar</button></div>
+    </div>
+    <div class="help">
+      <h3>Como escrever</h3>
+      <p>Escreva só o <b>corpo</b> do programa, numa sintaxe comum às quatro linguagens. O simulador gera o programa completo em C, C++, Java ou C#. Um comando por linha.</p>
+      <ul>
+        <li>Tipos: <code>char</code>, <code>short</code>, <code>int</code>, <code>long</code>, <code>float</code>, <code>double</code></li>
+        <li>Declarar: <code>int a;</code> ou <code>int a = 5;</code></li>
+        <li>Atribuir: <code>a = b * 2 + 1;</code></li>
+        <li>Operadores: <code>+ - * / %</code>, parênteses e cast: <code>(double) a / b</code></li>
+        <li>Literais: <code>42</code>, <code>3.14</code>, <code>2.5f</code>, <code>'A'</code></li>
+        <li>Mostrar na tela: <code>print("Soma: ", a + b);</code> — vira <code>printf</code>, <code>cout</code>, <code>System.out.println</code> ou <code>Console.WriteLine</code></li>
+        <li>Comentários: <code>// texto</code> (também no fim da linha)</li>
+      </ul>
+      <p>Erros que só uma das linguagens aponta (por exemplo, usar variável sem valor em Java/C#) aparecem quando você troca a linguagem.</p>
+    </div>
+  </div>
+</div>
+
+<script>
+{
+const BASEADDR = 0x1000, NREG = 4;
+const PAL = ['#2f6fed','#e5484d','#1f9d55','#d97706','#8e4ec6','#0e9fb0','#d6409f','#6b8e23'];
+const TYPES = ['char','short','int','long','float','double'];
+const LNAME = {c:'C', cpp:'C++', java:'Java', cs:'C#'};
+const OUTF = {c:'printf', cpp:'cout', java:'System.out.println', cs:'Console.WriteLine'};
+const RESERVED = new Set(('main Main class new public private static void return using namespace string String System Console printf cout endl bool boolean true false this if else while for do switch case break continue const unsigned signed sizeof struct byte object var in out ref base is as params final import package default goto try catch throw null print std args include int char short long float double').split(' '));
+const MN = {'+':'ADD','-':'SUB','*':'MUL','/':'DIV','%':'MOD'};
+
+const EX = [
+ {n:'1. Declaração, atribuição e soma', s:`// Declaração: reserva espaço na memória
+int a;
+int b;
+// Atribuição: grava valores nas variáveis
+a = 5;
+b = 7;
+int soma;
+soma = a + b;
+print("Soma: ", soma);`},
+ {n:'2. Tipos e tamanhos (sizeof, alinhamento)', s:`char letra = 'A';
+short pequeno = 300;
+int numero = 100000;
+long grande = 5000000000;
+float preco = 3.5;
+double pi = 3.14159;
+print("letra = ", letra);
+print("numero = ", numero);
+print("grande = ", grande);
+print("pi = ", pi);`},
+ {n:'3. Precedência de operadores', s:`int x = 3;
+int y = 4;
+int z = x + y * 2;     // * antes de +
+int w = (x + y) * 2;   // parênteses primeiro
+print("x + y * 2 = ", z);
+print("(x + y) * 2 = ", w);`},
+ {n:'4. Divisão inteira × divisão real', s:`int a = 7;
+int b = 2;
+int q = a / b;
+int r = a % b;
+double m = a / 2.0;
+double n = (double) a / b;
+print("7 / 2 = ", q);
+print("7 % 2 = ", r);
+print("7 / 2.0 = ", m);
+print("(double) 7 / 2 = ", n);`},
+ {n:'5. Troca de valores (swap)', s:`int a = 10;
+int b = 20;
+int aux;
+aux = a;
+a = b;
+b = aux;
+print("a = ", a, ", b = ", b);`},
+ {n:'6. Overflow de inteiro', s:`int maior = 2147483647;   // maior int de 32 bits
+print("maior = ", maior);
+maior = maior + 1;
+print("maior + 1 = ", maior);`},
+ {n:'7. Números negativos (complemento de dois)', s:`int positivo = 1;
+int negativo = -1;
+short s = -2;
+print("negativo = ", negativo);
+print("s = ", s);`},
+ {n:'8. char também é número', s:`char c = 'A';
+int codigo = c;
+char d = (char) (c + 2);
+print("c = ", c, " (código ", codigo, ")");
+print("d = ", d);`},
+ {n:'9. Conversões e perda de precisão', s:`double nota = 7.8;
+int inteiro = (int) nota;
+float f = 0.1;
+double d = f;
+print("inteiro = ", inteiro);
+print("d = ", d);`},
+ {n:'10. Variável não inicializada (lixo)', s:`int x;
+int y = x + 1;   // x nunca recebeu valor!
+print("y = ", y);`}
+];
+
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const hx = (n, w) => n.toString(16).toUpperCase().padStart(w, '0');
+const hexA = a => '0x' + hx(a, 4);
+const isInt = t => t !== 'float' && t !== 'double';
+const J = () => LANG === 'java' || LANG === 'cs';
+
+let LANG = 'c', BASE = 'hex', LITTLE = true, SRC = EX[0].s, exIdx = 0;
+let STM = [], CODE = null, COMP = null, PERR = null, S = null, k = 0, busy = false, playing = false;
+try { const sv = JSON.parse(localStorage.getItem('memsim') || 'null'); if (sv) { LANG = sv.lang || LANG; BASE = sv.base || BASE; if (sv.src) { SRC = sv.src; exIdx = sv.ex ?? 0; } } } catch (e) {}
+const save = () => { try { localStorage.setItem('memsim', JSON.stringify({lang: LANG, base: BASE, src: SRC, ex: exIdx})); } catch (e) {} };
+
+const sizeOf = t => t === 'char' ? (J() ? 2 : 1) : {short:2, int:4, long:8, float:4, double:8}[t];
+const tname = t => t === 'long' && !J() ? 'long long' : t;
+const promote = (a, b) => (a === 'double' || b === 'double') ? 'double' : (a === 'float' || b === 'float') ? 'float' : (a === 'long' || b === 'long') ? 'long' : 'int';
+
+/* ---------- análise do código-base ---------- */
+function charCode(v) { if (v[0] !== '\\') return v.charCodeAt(0); return ({n:10, t:9, '0':0, '\\':92, "'":39, '"':34, r:13})[v[1]] ?? v.charCodeAt(1); }
+function lexLine(s) {
+  const toks = []; let i = 0, comment = null, m;
+  while (i < s.length) {
+    const r = s.slice(i);
+    if (/^\s/.test(r)) { i++; continue; }
+    if (r.startsWith('//')) { comment = r.slice(2).trim(); break; }
+    if ((m = /^"((?:\\.|[^"\\])*)"/.exec(r))) { toks.push({k:'str', v:m[1]}); i += m[0].length; continue; }
+    if ((m = /^'(\\.|[^'\\])'/.exec(r))) { toks.push({k:'chr', v:m[1], text:m[0]}); i += m[0].length; continue; }
+    if ((m = /^(?:\d+\.\d*|\.\d+|\d+)(?:[eE][+-]?\d+)?[fF]?/.exec(r))) { toks.push({k:'num', v:m[0]}); i += m[0].length; continue; }
+    if ((m = /^[A-Za-z_]\w*/.exec(r))) { toks.push({k:'id', v:m[0]}); i += m[0].length; continue; }
+    if ('()+-*/%=;,'.includes(r[0])) { toks.push({k:'op', v:r[0]}); i++; continue; }
+    throw new Error(`Caractere inesperado: "${r[0]}".`);
+  }
+  return {toks, comment};
+}
+function mkNum(text) {
+  const f = /[fF]$/.test(text), core = text.replace(/[fF]$/, '');
+  if (f || /[.eE]/.test(core)) { const v = Number(core); return {k:'lit', type: f ? 'float' : 'double', value: f ? Math.fround(v) : v, text: core}; }
+  const b = BigInt(core);
+  if (b > 9223372036854775807n) throw new Error('Número grande demais (não cabe em 64 bits).');
+  return {k:'lit', type: b <= 2147483647n ? 'int' : 'long', value: b, text: core};
+}
+function parseSource(src) {
+  const lines = src.replace(/\r/g, '').split('\n');
+  while (lines.length && !lines[lines.length - 1].trim()) lines.pop();
+  const out = [];
+  lines.forEach((ln, li) => {
+    try {
+      const L = lexLine(ln), T = L.toks; let p = 0;
+      if (!T.length) { out.push(L.comment !== null ? {kind:'comment', text:L.comment} : {kind:'blank'}); return; }
+      const is = (k, v) => T[p] && T[p].k === k && (v === undefined || T[p].v === v);
+      const next = () => T[p++];
+      const expect = (k, v, what) => { if (!is(k, v)) throw new Error(`Esperado ${what}${T[p] ? `, mas encontrado "${T[p].v}"` : ' no fim da linha'}.`); return next(); };
+      const name = () => { const t = expect('id', undefined, 'um nome de variável'); if (RESERVED.has(t.v)) throw new Error(`"${t.v}" é palavra reservada em alguma das linguagens e não pode ser nome de variável.`); return t.v; };
+      const primary = () => {
+        const t = T[p]; if (!t) throw new Error('Expressão incompleta.');
+        if (t.k === 'num') { next(); return mkNum(t.v); }
+        if (t.k === 'chr') { next(); return {k:'lit', type:'char', value:BigInt(charCode(t.v)), text:t.text}; }
+        if (t.k === 'id') return {k:'var', name:name()};
+        if (is('op', '(')) { next(); const e = expr(); expect('op', ')', '")"'); return {k:'paren', e}; }
+        throw new Error(`Símbolo inesperado "${t.v}".`);
+      };
+      const unary = () => {
+        if (is('op', '-')) { next(); return {k:'neg', e:unary()}; }
+        if (is('op', '+')) { next(); return unary(); }
+        if (is('op', '(') && T[p+1] && T[p+1].k === 'id' && TYPES.includes(T[p+1].v) && T[p+2] && T[p+2].v === ')') { const ty = T[p+1].v; p += 3; return {k:'cast', type:ty, e:unary()}; }
+        return primary();
+      };
+      const term = () => { let l = unary(); while (is('op','*') || is('op','/') || is('op','%')) { const op = next().v; l = {k:'bin', op, l, r:unary()}; } return l; };
+      const expr = () => { let l = term(); while (is('op','+') || is('op','-')) { const op = next().v; l = {k:'bin', op, l, r:term()}; } return l; };
+      let st;
+      if (is('id') && TYPES.includes(T[0].v)) {
+        next(); const nm = name(); let init = null;
+        if (is('op', '=')) { next(); init = expr(); }
+        expect('op', ';', '";"'); st = {kind:'decl', type:T[0].v, name:nm, init};
+      } else if (is('id', 'print')) {
+        next(); expect('op', '(', '"("'); const args = [];
+        if (!is('op', ')')) do { args.push(is('str') ? {str:next().v} : {expr:expr()}); } while (is('op', ',') && next());
+        expect('op', ')', '")"'); expect('op', ';', '";"'); st = {kind:'print', args};
+      } else if (is('id')) {
+        const nm = name(); expect('op', '=', '"="'); const e = expr(); expect('op', ';', '";"'); st = {kind:'assign', name:nm, expr:e};
+      } else throw new Error('Comando não reconhecido.');
+      if (p < T.length) throw new Error(`Sobrou "${T[p].v}" depois do ";". Use um comando por linha.`);
+      st.comment = L.comment; out.push(st);
+    } catch (e) { e.line = li + 1; throw e; }
+  });
+  // literal decimal atribuído a float vira literal float (2.5 → 2.5f)
+  const types = {};
+  const strip = n => n.k === 'paren' || n.k === 'neg' ? strip(n.e) : n;
+  out.forEach(st => {
+    if (st.kind === 'decl') types[st.name] = st.type;
+    const tgt = st.kind === 'decl' ? st.type : st.kind === 'assign' ? types[st.name] : null;
+    const e = st.init || st.expr;
+    if (tgt === 'float' && e) { const l = strip(e); if (l.k === 'lit' && l.type === 'double') { l.type = 'float'; l.value = Math.fround(l.value); } }
+  });
+  return out;
+}
+function typeOf(n, types) {
+  switch (n.k) {
+    case 'lit': return n.type;
+    case 'var': return types[n.name] || 'int';
+    case 'paren': return typeOf(n.e, types);
+    case 'neg': return promote(typeOf(n.e, types), 'int');
+    case 'cast': return n.type;
+    case 'bin': return promote(typeOf(n.l, types), typeOf(n.r, types));
+  }
+}
+
+/* ---------- geração do programa completo ---------- */
+function litText(n) {
+  if (n.type === 'float') { let t = n.text; if (!/[.eE]/.test(t)) t += '.0'; return t + 'f'; }
+  if (n.type === 'long') return n.text + (J() ? 'L' : 'LL');
+  return n.text;
+}
+function ex(n) {
+  switch (n.k) {
+    case 'lit': return litText(n);
+    case 'var': return n.name;
+    case 'paren': return '(' + ex(n.e) + ')';
+    case 'neg': return '-' + ex(n.e);
+    case 'cast': return `(${tname(n.type)}) ${ex(n.e)}`;
+    case 'bin': return `${ex(n.l)} ${n.op} ${ex(n.r)}`;
+  }
+}
+function printCode(args, types) {
+  if (LANG === 'c') {
+    let f = '', a = '';
+    args.forEach(x => {
+      if (x.str !== undefined) f += x.str.replace(/%/g, '%%');
+      else { const t = typeOf(x.expr, types); f += t === 'char' ? '%c' : t === 'long' ? '%lld' : isInt(t) ? '%d' : '%f'; a += ', ' + ex(x.expr); }
+    });
+    return `printf("${f}\\n"${a});`;
+  }
+  if (LANG === 'cpp') return 'cout << ' + args.map(x => x.str !== undefined ? `"${x.str}"` : ex(x.expr)).concat('endl').join(' << ') + ';';
+  if (LANG === 'java') {
+    if (!args.length) return 'System.out.println();';
+    if (args.length === 1 && !args[0].str) return `System.out.println(${ex(args[0].expr)});`;
+    const ps = args.map(x => x.str !== undefined ? `"${x.str}"` : (x.expr.k === 'bin' || x.expr.k === 'neg') ? `(${ex(x.expr)})` : ex(x.expr));
+    if (args[0].str === undefined) ps.unshift('""');
+    return `System.out.println(${ps.join(' + ')});`;
+  }
+  if (!args.length) return 'Console.WriteLine();';
+  if (args.length === 1 && args[0].str === undefined) return `Console.WriteLine(${ex(args[0].expr)});`;
+  if (args.every(x => x.str !== undefined)) return `Console.WriteLine("${args.map(x => x.str).join('')}");`;
+  return `Console.WriteLine($"${args.map(x => x.str !== undefined ? x.str.replace(/[{}]/g, c => c + c) : `{${ex(x.expr)}}`).join('')}");`;
+}
+function codegen(stmts) {
+  const ind = J() ? '        ' : '    ';
+  const pre = {c:['#include <stdio.h>', '', 'int main(void) {'], cpp:['#include <iostream>', 'using namespace std;', '', 'int main() {'],
+    java:['public class Main {', '    public static void main(String[] args) {'], cs:['using System;', '', 'class Program', '{', '    static void Main()', '    {']}[LANG];
+  const post = {c:['    return 0;', '}'], cpp:['    return 0;', '}'], java:['    }', '}'], cs:['    }', '}']}[LANG];
+  const lines = [...pre], stmtLine = [], types = {};
+  const mainLine = LANG === 'cs' ? 4 : pre.length - 1;
+  stmts.forEach((st, i) => {
+    let t = '';
+    if (st.kind === 'decl') { types[st.name] = st.type; t = `${tname(st.type)} ${st.name}${st.init ? ' = ' + ex(st.init) : ''};`; }
+    else if (st.kind === 'assign') t = `${st.name} = ${ex(st.expr)};`;
+    else if (st.kind === 'print') t = printCode(st.args, types);
+    else if (st.kind === 'comment') t = '// ' + st.text;
+    if (st.comment) t += (t ? '   ' : '') + '// ' + st.comment;
+    stmtLine[i] = lines.length; lines.push(t ? ind + t : '');
+  });
+  const endLine = lines.length;
+  lines.push(...post);
+  return {lines, stmtLine, mainLine, endLine};
+}
+
+/* ---------- compilação para micro-operações ---------- */
+const CM = {
+  undecl: n => ({c:`error: '${n}' undeclared (first use in this function)`, cpp:`error: '${n}' was not declared in this scope`, java:`error: cannot find symbol\n  symbol:   variable ${n}`, cs:`error CS0103: The name '${n}' does not exist in the current context`}),
+  redecl: (n, t) => ({c:`error: redefinition of '${n}'`, cpp:`error: redeclaration of '${tname(t)} ${n}'`, java:`error: variable ${n} is already defined in method main(String[])`, cs:`error CS0128: A local variable named '${n}' is already defined in this scope`}),
+  uninit: n => ({java:`error: variable ${n} might not have been initialized`, cs:`error CS0165: Use of unassigned local variable '${n}'`, c:`warning: '${n}' is used uninitialized [-Wuninitialized]`, cpp:`warning: '${n}' is used uninitialized [-Wuninitialized]`}),
+  lossy: (f, t) => ({java:`error: incompatible types: possible lossy conversion from ${f} to ${t}`, cs:`error CS0266: Cannot implicitly convert type '${f}' to '${t}'. An explicit conversion exists (are you missing a cast?)`}),
+  fmod: (a, b) => ({c:`error: invalid operands to binary % (have '${a}' and '${b}')`, cpp:`error: invalid operands of types '${a}' and '${b}' to binary 'operator%'`})
+};
+const WIDEN = {char:['int','long','float','double'], short:['int','long','float','double'], int:['long','float','double'], long:['float','double'], float:['double'], double:[]};
+function constInt(n) { if (n.k === 'paren') return constInt(n.e); if (n.k === 'neg') { const v = constInt(n.e); return v === null ? null : -v; } return n.k === 'lit' && n.type === 'int' ? n.value : null; }
+function implicitOK(from, to, e) {
+  if (WIDEN[from].includes(to)) return true;
+  const c = constInt(e);
+  if (c !== null) {
+    if (to === 'short' && c >= -32768n && c <= 32767n) return true;
+    if (to === 'char' && LANG === 'java' && c >= 0n && c <= 65535n) return true;
+  }
+  return false;
+}
+function compile(stmts) {
+  const vars = {}, order = [], ops = [{t:'START', s:-1}], errors = [], warnings = [], assigned = new Set();
+  let cur = 0, si = 0;
+  const fail = (msg, cc) => { const e = new Error(msg); e.cc = cc; throw e; };
+  const gen = (n, r) => {
+    if (r >= NREG) fail('Expressão complexa demais para os 4 registradores deste simulador. Divida-a em partes usando variáveis auxiliares.');
+    switch (n.k) {
+      case 'lit': ops.push({t:'LOADI', r, type:n.type, value:n.value, disp:n.type === 'char' ? n.text : litText(n), s:si}); return n.type;
+      case 'var': {
+        const v = vars[n.name];
+        if (!v) fail(`A variável <b>${n.name}</b> é usada sem ter sido declarada.`, CM.undecl(n.name)[LANG]);
+        if (!assigned.has(n.name)) {
+          if (J()) fail(`A variável <b>${n.name}</b> é lida antes de receber um valor. ${LNAME[LANG]} não permite isso: o programa nem compila.`, CM.uninit(n.name)[LANG]);
+          if (!warnings.some(w => w.name === n.name)) warnings.push({si, name:n.name, msg:`A variável <b>${n.name}</b> é lida antes de receber um valor. ${LNAME[LANG]} compila (no máximo com um aviso), mas o valor lido é lixo de memória.`, cc:CM.uninit(n.name)[LANG]});
+        }
+        ops.push({t:'LOADV', r, v:n.name, s:si}); return v.type;
+      }
+      case 'paren': return gen(n.e, r);
+      case 'neg': { const t = gen(n.e, r), pt = promote(t, 'int'); if (t !== pt) ops.push({t:'CVT', r, from:t, to:pt, why:'promo', s:si}); ops.push({t:'NEG', r, type:pt, s:si}); return pt; }
+      case 'cast': { const t = gen(n.e, r); if (t !== n.type) ops.push({t:'CVT', r, from:t, to:n.type, why:'cast', s:si}); return n.type; }
+      case 'bin': {
+        const lt = gen(n.l, r), rt = gen(n.r, r + 1), pt = promote(lt, rt);
+        if (n.op === '%' && !isInt(pt) && !J()) fail('Em C e C++ o operador <code>%</code> só funciona com inteiros (para reais use <code>fmod</code>).', CM.fmod(tname(lt), tname(rt))[LANG]);
+        if (lt !== pt) ops.push({t:'CVT', r, from:lt, to:pt, why: isInt(pt) ? 'promo' : 'arith', s:si});
+        if (rt !== pt) ops.push({t:'CVT', r:r + 1, from:rt, to:pt, why: isInt(pt) ? 'promo' : 'arith', s:si});
+        ops.push({t:'ALU', op:n.op, d:r, a:r, b:r + 1, type:pt, s:si}); return pt;
+      }
+    }
+  };
+  const assign = (name, e) => {
+    const v = vars[name];
+    if (!v) fail(`A variável <b>${name}</b> recebe um valor, mas não foi declarada.`, CM.undecl(name)[LANG]);
+    const et = gen(e, 0);
+    if (et !== v.type) {
+      if (J() && !implicitOK(et, v.type, e)) fail(`Atribuir um <code>${et}</code> a <b>${name}</b> (<code>${v.type}</code>) pode perder informação. ${LNAME[LANG]} exige uma conversão explícita (cast), por exemplo <code>(${v.type})</code>.`, CM.lossy(et, v.type)[LANG]);
+      ops.push({t:'CVT', r:0, from:et, to:v.type, why:'assign', s:si});
+    }
+    ops.push({t:'STORE', v:name, r:0, s:si}); assigned.add(name);
+  };
+  try {
+    for (si = 0; si < stmts.length; si++) {
+      const st = stmts[si];
+      if (st.kind === 'decl') {
+        if (vars[st.name]) fail(`A variável <b>${st.name}</b> já foi declarada antes.`, CM.redecl(st.name, st.type)[LANG]);
+        const size = sizeOf(st.type), at = Math.ceil(cur / size) * size;
+        const v = {name:st.name, type:st.type, size, addr:BASEADDR + at, padFrom:BASEADDR + cur, color:PAL[order.length % PAL.length]};
+        cur = at + size; vars[st.name] = v; order.push(v);
+        ops.push({t:'ALLOC', v:st.name, s:si});
+        if (st.init) assign(st.name, st.init);
+      } else if (st.kind === 'assign') assign(st.name, st.expr);
+      else if (st.kind === 'print') {
+        if (!st.args.length) ops.push({t:'OUTS', str:'', nl:true, s:si});
+        st.args.forEach((a, i) => {
+          const nl = i === st.args.length - 1;
+          if (a.str !== undefined) ops.push({t:'OUTS', str:unesc(a.str), nl, s:si});
+          else { const t = gen(a.expr, 0); ops.push({t:'OUTV', r:0, type:t, nl, s:si}); }
+        });
+      }
+    }
+  } catch (e) { if (!e.cc && !e.message) throw e; errors.push({si, msg:e.message, cc:e.cc}); }
+  ops.push({t:'END', s:-2});
+  return {vars, order, ops, errors, warnings, total:cur};
+}
+const unesc = s => s.replace(/\\(.)/g, (m, c) => ({n:'\n', t:'\t', '\\':'\\', '"':'"', "'":"'", '0':''})[c] ?? c);
+
+/* ---------- representação dos valores ---------- */
+function wrap(t, b) {
+  switch (t) {
+    case 'char': return J() ? BigInt.asUintN(16, b) : BigInt.asIntN(8, b);
+    case 'short': return BigInt.asIntN(16, b);
+    case 'int': return BigInt.asIntN(32, b);
+    default: return BigInt.asIntN(64, b);
+  }
+}
+function enc(t, v, little) {
+  const n = sizeOf(t), dv = new DataView(new ArrayBuffer(n));
+  switch (t) {
+    case 'char': n === 1 ? dv.setInt8(0, Number(BigInt.asIntN(8, v))) : dv.setUint16(0, Number(BigInt.asUintN(16, v)), little); break;
+    case 'short': dv.setInt16(0, Number(BigInt.asIntN(16, v)), little); break;
+    case 'int': dv.setInt32(0, Number(BigInt.asIntN(32, v)), little); break;
+    case 'long': dv.setBigInt64(0, BigInt.asIntN(64, v), little); break;
+    case 'float': dv.setFloat32(0, v, little); break;
+    case 'double': dv.setFloat64(0, v, little); break;
+  }
+  return [...new Uint8Array(dv.buffer)];
+}
+function dec(t, bytes, little) {
+  const dv = new DataView(new Uint8Array(bytes).buffer);
+  switch (t) {
+    case 'char': return bytes.length === 1 ? BigInt(dv.getInt8(0)) : BigInt(dv.getUint16(0, little));
+    case 'short': return BigInt(dv.getInt16(0, little));
+    case 'int': return BigInt(dv.getInt32(0, little));
+    case 'long': return dv.getBigInt64(0, little);
+    case 'float': return dv.getFloat32(0, little);
+    case 'double': return dv.getFloat64(0, little);
+  }
+}
+function conv(from, to, v) {
+  if (isInt(from) && isInt(to)) return wrap(to, v);
+  if (isInt(from)) { const n = Number(v); return to === 'float' ? Math.fround(n) : n; }
+  if (!isInt(to)) return to === 'float' ? Math.fround(v) : v;
+  if (!isFinite(v)) return 0n;
+  let b = BigInt(Math.trunc(v));
+  if (LANG === 'java' && (to === 'int' || to === 'long')) { const bits = to === 'int' ? 32 : 64, mx = (1n << BigInt(bits - 1)) - 1n; if (b > mx) b = mx; if (b < -mx - 1n) b = -mx - 1n; }
+  return wrap(to, b);
+}
+function shortF(v) { for (let p = 1; p < 10; p++) { const x = parseFloat(v.toPrecision(p)); if (Math.fround(x) === v) return String(x); } return String(v); }
+function num(t, v) {
+  if (isInt(t)) return v.toString();
+  if (!isFinite(v)) return String(v);
+  const s = t === 'float' ? shortF(v) : String(v);
+  return /[.e]/.test(s) || /Infinity|NaN/.test(s) ? s : s + '.0';
+}
+function glyph(t, v) { const c = Number(BigInt.asUintN(16, v)); return c >= 32 && c < 127 ? ` '${String.fromCharCode(c)}'` : ''; }
+function fmtVal(t, v, base) {
+  if (base === 'dec') return num(t, v) + (t === 'char' ? glyph(t, v) : '');
+  const b = enc(t, v, false);
+  return base === 'hex' ? '0x' + b.map(x => hx(x, 2)).join('') : b.map(x => x.toString(2).padStart(8, '0')).join(' ');
+}
+const byteStr = b => BASE === 'hex' ? hx(b, 2) : BASE === 'bin' ? b.toString(2).padStart(8, '0').replace(/^(....)/, '$1<br>') : String(b);
+function gfmt(v, p) {
+  if (v === 0) return '0';
+  let [m, x] = v.toExponential(p - 1).split('e'); x = parseInt(x);
+  if (x < -4 || x >= p) { if (m.includes('.')) m = m.replace(/\.?0+$/, ''); return m + 'e' + (x < 0 ? '-' : '+') + String(Math.abs(x)).padStart(2, '0'); }
+  let f = v.toFixed(Math.max(0, p - 1 - x)); if (f.includes('.')) f = f.replace(/\.?0+$/, ''); return f;
+}
+function fmtOut(t, v) {
+  if (t === 'char') return String.fromCharCode(J() ? Number(v) : Number(BigInt.asUintN(8, v)));
+  if (isInt(t)) return v.toString();
+  if (isNaN(v)) return LANG === 'c' || LANG === 'cpp' ? 'nan' : 'NaN';
+  if (!isFinite(v)) return (v < 0 ? '-' : '') + (LANG === 'java' ? 'Infinity' : LANG === 'cs' ? '∞' : 'inf');
+  if (LANG === 'c') return v.toFixed(6);
+  if (LANG === 'cpp') return gfmt(v, 6);
+  const digits = t === 'float' ? shortF(v) : String(v), n = Number(digits), a = Math.abs(n);
+  if (LANG === 'java') {
+    if (n === 0) return '0.0';
+    if (a >= 1e-3 && a < 1e7) { const s = String(n); return s.includes('.') ? s : s + '.0'; }
+    let [m, x] = n.toExponential().split('e'); if (!m.includes('.')) m += '.0'; return m + 'E' + parseInt(x);
+  }
+  const x = n === 0 ? 0 : Math.floor(Math.log10(a));
+  if (x >= (t === 'float' ? 7 : 15) || x < -5) { let [m, e] = n.toExponential().split('e'); e = parseInt(e); return m + 'E' + (e < 0 ? '-' : '+') + String(Math.abs(e)).padStart(2, '0'); }
+  return String(n);
+}
+function junk(a) { let x = Math.imul(a ^ 0x5bd1e995, 2654435761) >>> 0; x ^= x >>> 15; x = Math.imul(x, 0x2c1b3c6d) >>> 0; x ^= x >>> 12; return x & 255; }
+const range = (a, n) => n === 1 ? hexA(a) : `${hexA(a)}–${hexA(a + n - 1)}`;
+
+/* ---------- estado e execução ---------- */
+function newState() {
+  const N = memSize();
+  return {mem:new Uint8Array(N), cell:new Array(N).fill('free'), alloc:new Set(), init:new Set(), regs:new Array(NREG).fill(null), alu:null, out:'', error:null, msg:null, ttl:null, ch:null};
+}
+function cloneS(s) { return {...s, mem:new Uint8Array(s.mem), cell:[...s.cell], alloc:new Set(s.alloc), init:new Set(s.init), regs:s.regs.map(r => r && {...r})}; }
+const memSize = () => Math.max(32, Math.ceil(COMP.total / 8) * 8 + 8);
+const readVar = (s, v) => dec(v.type, [...s.mem.slice(v.addr - BASEADDR, v.addr - BASEADDR + v.size)], LITTLE);
+const rv = r => r ? num(r.type, r.v) + (r.type === 'char' ? glyph(r.type, r.v) : '') : '?';
+
+function applyOp(s, op) {
+  const ch = s.ch = {regs:new Set(), bytes:new Set(), vars:new Set(), alu:false, out:false};
+  const V = op.v && COMP.vars[op.v], L = LNAME[LANG];
+  switch (op.t) {
+    case 'START':
+      s.ttl = 'Início';
+      s.msg = `O sistema operacional chama <code>${LANG === 'cs' ? 'Main' : 'main'}</code>. Na <b>pilha</b> (stack) é reservado um bloco de memória (stack frame) para as variáveis locais dessa função.`;
+      break;
+    case 'ALLOC': {
+      s.alloc.add(V.name); ch.vars.add(V.name);
+      for (let a = V.padFrom; a < V.addr; a++) s.cell[a - BASEADDR] = 'pad';
+      for (let a = V.addr; a < V.addr + V.size; a++) {
+        const i = a - BASEADDR; ch.bytes.add(i);
+        if (J()) { s.mem[i] = 0; s.cell[i] = 'unk'; } else { s.mem[i] = junk(a); s.cell[i] = 'junk'; }
+      }
+      s.ttl = 'Declaração';
+      s.msg = `O compilador reserva <b>${V.size} byte${V.size > 1 ? 's' : ''}</b> para <b>${V.name}</b>, do tipo <code>${tname(V.type)}</code>, ${V.size > 1 ? 'nos endereços' : 'no endereço'} ${range(V.addr, V.size)}.`;
+      if (V.padFrom < V.addr) s.msg += ` ${range(V.padFrom, V.addr - V.padFrom)} ${V.addr - V.padFrom > 1 ? 'ficaram' : 'ficou'} sem uso (<i>padding</i>) para que ${V.name} comece num endereço múltiplo de ${V.size}: isso é <b>alinhamento</b>.`;
+      s.msg += J() ? ` Em ${L}, a variável ainda não tem valor utilizável: o compilador proíbe lê-la antes da primeira atribuição (por isso “?”).`
+                   : ` Em ${L}, a variável nasce com o que já estava nesses bytes: <b>lixo de memória</b> (em vermelho).`;
+      if (V.type === 'char') s.msg += J() ? ` Em ${L}, <code>char</code> ocupa 2 bytes (UTF-16); em C/C++, 1 byte.` : '';
+      break;
+    }
+    case 'LOADV': {
+      const v = readVar(s, V); s.regs[op.r] = {type:V.type, v}; ch.regs.add(op.r);
+      s.ttl = 'Leitura da memória';
+      s.msg = `A CPU lê ${V.size > 1 ? `os ${V.size} bytes` : 'o byte'} de <b>${V.name}</b> (${range(V.addr, V.size)}), monta o valor <b>${rv(s.regs[op.r])}</b> e o coloca no registrador <b>R${op.r}</b>.`;
+      if (!s.init.has(V.name)) s.msg += ` <b>Atenção:</b> ${V.name} nunca recebeu valor, então a CPU leu <b>lixo de memória</b>. Em ${L} isso é comportamento indefinido.`;
+      break;
+    }
+    case 'LOADI':
+      s.regs[op.r] = {type:op.type, v:op.value}; ch.regs.add(op.r);
+      s.ttl = 'Valor literal';
+      s.msg = `A constante <code>${esc(op.disp)}</code> está escrita no próprio programa (tipo <code>${tname(op.type)}</code>). Ela vai direto para o registrador <b>R${op.r}</b>, sem passar por nenhuma variável.`;
+      break;
+    case 'ALU': {
+      const A = s.regs[op.a], Bv = s.regs[op.b], it = isInt(op.type); ch.alu = true;
+      s.ttl = 'Cálculo na ULA';
+      if (it && (op.op === '/' || op.op === '%') && Bv.v === 0n) {
+        s.alu = {sym:op.op, text:`${rv(A)} ${op.op} 0 = ?`};
+        s.error = {c:'Floating point exception (core dumped)', cpp:'Floating point exception (core dumped)', java:'Exception in thread "main" java.lang.ArithmeticException: / by zero', cs:'Unhandled exception. System.DivideByZeroException: Attempted to divide by zero.'}[LANG];
+        s.msg = `Divisão inteira por zero! ${J() ? `Em ${L}, isso lança uma exceção e o programa termina.` : `Em ${L}, é comportamento indefinido; na prática o processador gera uma exceção e o programa é abortado.`}`;
+        s.out += s.error + '\n'; ch.out = true; break;
+      }
+      let m, w;
+      if (it) { const a = A.v, b = Bv.v; m = op.op === '+' ? a + b : op.op === '-' ? a - b : op.op === '*' ? a * b : op.op === '/' ? a / b : a % b; w = wrap(op.type, m); }
+      else { const a = A.v, b = Bv.v; w = op.op === '+' ? a + b : op.op === '-' ? a - b : op.op === '*' ? a * b : op.op === '/' ? a / b : a % b; if (op.type === 'float') w = Math.fround(w); }
+      s.regs[op.d] = {type:op.type, v:w}; ch.regs.add(op.d);
+      s.alu = {sym:op.op, text:`${rv(A)} ${op.op} ${rv(Bv)} = ${num(op.type, w)}`};
+      s.msg = `A <b>ULA</b> (Unidade Lógica e Aritmética) calcula ${rv(A)} ${op.op} ${rv(Bv)} = <b>${num(op.type, w)}</b> e guarda o resultado em <b>R${op.d}</b>.`;
+      if (it && op.op === '/') s.msg += ` Como os dois operandos são inteiros, é uma <b>divisão inteira</b>: a parte fracionária é descartada.`;
+      if (it && op.op === '%') s.msg += ` O operador <code>%</code> dá o <b>resto</b> da divisão inteira.`;
+      if (!it) s.msg += ` A conta é feita em ponto flutuante (padrão IEEE 754, tipo <code>${op.type}</code>).`;
+      if (it && w !== m) {
+        s.msg += ` <b>Overflow!</b> O resultado matemático ${m} não cabe em ${sizeOf(op.type) * 8} bits; só os bits menos significativos sobram e o valor “dá a volta” para ${w}.`;
+        s.msg += J() ? (LANG === 'java' ? ' Em Java, esse é o comportamento definido pela linguagem.' : ' Em C#, esse é o padrão (contexto <code>unchecked</code>); dentro de <code>checked</code> seria lançada OverflowException.')
+                     : ` Em ${L}, overflow de inteiro com sinal é <i>comportamento indefinido</i>; o que se vê aqui é o resultado mais comum na prática.`;
+      }
+      break;
+    }
+    case 'NEG': {
+      const A = s.regs[op.r], w = isInt(op.type) ? wrap(op.type, -A.v) : -A.v;
+      s.regs[op.r] = {type:op.type, v:w}; ch.regs.add(op.r); ch.alu = true;
+      s.alu = {sym:'−', text:`−(${num(op.type, A.v)}) = ${num(op.type, w)}`};
+      s.ttl = 'Troca de sinal';
+      s.msg = `A ULA troca o sinal: −(${num(op.type, A.v)}) = <b>${num(op.type, w)}</b>.` + (isInt(op.type) && w < 0n ? ' Mude a visualização para hexadecimal ou binário e veja como o negativo fica guardado em <b>complemento de dois</b> (inverte os bits e soma 1).' : '');
+      break;
+    }
+    case 'CVT': {
+      const A = s.regs[op.r], w = conv(op.from, op.to, A.v);
+      s.regs[op.r] = {type:op.to, v:w}; ch.regs.add(op.r);
+      s.ttl = op.why === 'cast' ? 'Conversão explícita (cast)' : 'Conversão automática';
+      s.msg = `O valor em <b>R${op.r}</b> passa de <code>${tname(op.from)}</code> para <code>${tname(op.to)}</code>: ${rv(A)} → <b>${rv(s.regs[op.r])}</b>.`;
+      if (op.why === 'promo') s.msg += ` Antes de uma conta, <code>char</code> e <code>short</code> são <b>promovidos</b> a <code>int</code>.`;
+      if (op.why === 'arith') s.msg += ` Numa conta entre tipos diferentes, o operando “menor” é convertido para o tipo “maior” antes do cálculo.`;
+      if (op.why === 'assign') s.msg += ` A conversão acontece porque a variável de destino é de outro tipo.`;
+      if (isInt(op.from) && !isInt(op.to)) s.msg += ' Inteiros e reais são codificados de formas totalmente diferentes: compare os bits em binário.';
+      if (!isInt(op.from) && isInt(op.to)) s.msg += ' A parte fracionária é simplesmente descartada (truncamento, não arredondamento).';
+      if (isInt(op.from) && isInt(op.to) && w !== A.v) s.msg += ' Os bits que não cabem no tipo menor foram descartados: o valor mudou!';
+      if (op.from === 'double' && op.to === 'float' && w !== A.v) s.msg += ' <code>float</code> tem menos precisão que <code>double</code>, então o valor foi arredondado.';
+      if (op.from === 'float' && op.to === 'double') s.msg += ' Agora aparecem todos os dígitos do valor que o <code>float</code> realmente guardava.';
+      break;
+    }
+    case 'STORE': {
+      const R = s.regs[op.r], bytes = enc(V.type, R.v, LITTLE), i0 = V.addr - BASEADDR;
+      bytes.forEach((b, j) => { s.mem[i0 + j] = b; s.cell[i0 + j] = 'val'; ch.bytes.add(i0 + j); });
+      ch.vars.add(V.name);
+      const first = !s.init.has(V.name); s.init.add(V.name);
+      s.ttl = 'Escrita na memória';
+      s.msg = `O valor <b>${rv(R)}</b> de <b>R${op.r}</b> é gravado em <b>${V.name}</b> (${range(V.addr, V.size)}). Bytes, do menor para o maior endereço: <code>${bytes.map(b => hx(b, 2)).join(' ')}</code>.`;
+      if (V.size > 1) s.msg += LITTLE ? ' Em <b>little-endian</b>, o byte menos significativo fica no menor endereço.' : ' Em <b>big-endian</b>, o byte mais significativo fica no menor endereço.';
+      if (first) s.msg += ` A partir de agora ${V.name} tem um valor definido.`;
+      break;
+    }
+    case 'OUTV': {
+      const R = s.regs[op.r], t = fmtOut(R.type, R.v);
+      s.out += t + (op.nl ? '\n' : ''); ch.out = true;
+      s.ttl = 'Saída';
+      s.msg = `<code>${OUTF[LANG]}</code> converte o valor de <b>R${op.r}</b> (<code>${tname(R.type)}</code>) em texto e escreve “${esc(t)}” na tela.`;
+      if (R.type === 'char') s.msg += ' Como o tipo é <code>char</code>, aparece o caractere, e não o número.';
+      else if (!isInt(R.type)) s.msg += {c:' Em C, <code>%f</code> mostra sempre 6 casas decimais.', cpp:' Por padrão, <code>cout</code> mostra até 6 algarismos significativos.', java:' Java mostra o menor número de dígitos que identifica o valor exatamente.', cs:' C# mostra o menor número de dígitos que identifica o valor exatamente.'}[LANG];
+      break;
+    }
+    case 'OUTS':
+      s.out += op.str + (op.nl ? '\n' : ''); ch.out = true;
+      s.ttl = 'Saída';
+      s.msg = op.str ? `O texto “${esc(op.str)}” (uma constante do programa) é escrito na tela, sem passar pela ULA.` : 'Uma quebra de linha é escrita na tela.';
+      break;
+    case 'END':
+      s.ttl = 'Fim';
+      s.msg = `${LANG === 'c' || LANG === 'cpp' ? '<code>return 0;</code> avisa ao sistema que o programa terminou sem erros. ' : ''}A função termina, o stack frame é liberado e as variáveis locais deixam de existir.`;
+      break;
+  }
+}
+function asmOf(op) {
+  if (!op) return '—';
+  const V = op.v && COMP.vars[op.v];
+  switch (op.t) {
+    case 'START': return 'CALL  main';
+    case 'END': return 'RET';
+    case 'ALLOC': return `ALLOC ${hexA(V.addr)}, ${V.size}    ; ${V.name}`;
+    case 'LOADV': return `LOAD  R${op.r}, [${hexA(V.addr)}]  ; ${V.name}`;
+    case 'LOADI': return `LOADI R${op.r}, ${op.disp}`;
+    case 'ALU': return `${(MN[op.op] + (isInt(op.type) ? '' : '.F')).padEnd(5)} R${op.d}, R${op.a}, R${op.b}`;
+    case 'NEG': return `NEG   R${op.r}`;
+    case 'CVT': return `CVT   R${op.r}, ${op.from}→${op.to}`;
+    case 'STORE': return `STORE [${hexA(V.addr)}], R${op.r}  ; ${V.name}`;
+    case 'OUTV': return `OUT   R${op.r}`;
+    case 'OUTS': return `OUT   "${op.str.replace(/\n/g, '\\n')}"`;
+  }
+}
+const lineOf = op => !op ? -1 : op.s >= 0 ? CODE.stmtLine[op.s] : op.s === -1 ? CODE.mainLine : CODE.endLine;
+
+/* ---------- desenho ---------- */
+const TY = new Set(['int','char','short','long','float','double','void','String']);
+const KW = new Set(['return','public','static','class','using','namespace']);
+const FN = new Set(['printf','cout','endl','System','out','println','Console','WriteLine','main','Main']);
+function hl(s) {
+  if (/^\s*#/.test(s)) return `<span class="t-pp">${esc(s)}</span>`;
+  let o = '', m; const re = /(\/\/.*$)|(\$?"(?:\\.|[^"\\])*")|('(?:\\.|[^'\\])')|(\b\d[\w.]*)|([A-Za-z_]\w*)|([\s\S])/g;
+  while ((m = re.exec(s))) {
+    if (m[1]) o += `<span class="t-cm">${esc(m[1])}</span>`;
+    else if (m[2] || m[3]) o += `<span class="t-st">${esc(m[0])}</span>`;
+    else if (m[4]) o += `<span class="t-nu">${esc(m[4])}</span>`;
+    else if (m[5]) o += TY.has(m[5]) ? `<span class="t-ty">${m[5]}</span>` : KW.has(m[5]) ? `<span class="t-kw">${m[5]}</span>` : FN.has(m[5]) ? `<span class="t-fn">${m[5]}</span>` : m[5];
+    else o += esc(m[6]);
+  }
+  return o;
+}
+function drawCode() {
+  const errLine = COMP.errors.length ? CODE.stmtLine[COMP.errors[0].si] : -1;
+  $('code').innerHTML = CODE.lines.map((l, i) => `<div class="cl${i === errLine ? ' err' : ''}" id="cl-${i}"><span class="ln">${i + 1}</span><span>${hl(l)}</span></div>`).join('');
+  $('langName').textContent = LNAME[LANG] + (LANG === 'java' ? ' · Main.java' : LANG === 'cs' ? ' · Program.cs' : LANG === 'c' ? ' · main.c' : ' · main.cpp');
+}
+function setCur(li) {
+  document.querySelectorAll('.cl.cur').forEach(e => e.classList.remove('cur'));
+  const el = $('cl-' + li); if (!el) return;
+  el.classList.add('cur');
+  const box = $('code'), t = el.offsetTop - box.offsetTop;
+  if (t < box.scrollTop + 20 || t > box.scrollTop + box.clientHeight - 40) box.scrollTop = t - box.clientHeight / 3;
+}
+function render(flash) {
+  const ch = flash && S.ch ? S.ch : {regs:new Set(), bytes:new Set(), vars:new Set()};
+  const ops = COMP.ops, last = ops[k - 1];
+  setCur(k ? lineOf(last) : -1);
+  // explicação
+  let h = '';
+  if (COMP.errors.length) {
+    const e = COMP.errors[0];
+    h = `<div class="ttl"><span class="tag" style="background:var(--bad)">Erro de compilação</span>linha ${CODE.stmtLine[e.si] + 1}</div><p>${e.msg}</p><div class="msgs"><div class="msg e">Mensagem do compilador ${LNAME[LANG]}:<pre>${esc(e.cc)}</pre></div></div>`;
+    if (!J()) h += '';
+    else h += '<p style="margin-top:8px">Troque para C ou C++ para ver o que aconteceria nessas linguagens, ou edite o programa.</p>';
+  } else if (!k) {
+    h = `<div class="ttl"><span class="tag">Pronto</span></div><p>Use <b>Avançar</b> (ou a seta →) para executar uma micro-operação por vez, ou <b>Executar</b> para ver tudo animado. Troque a linguagem ou a base numérica a qualquer momento: a execução continua do mesmo ponto.</p>`;
+  } else {
+    h = `<div class="ttl"><span class="tag"${S.error ? ' style="background:var(--bad)"' : ''}>${S.ttl}</span><span style="color:var(--mute);font-size:14px">linha ${lineOf(last) + 1}</span></div><p>${S.msg}</p>`;
+  }
+  const ws = COMP.errors.length ? [] : COMP.warnings;
+  if (ws.length) h += `<div class="msgs">${ws.map(w => `<div class="msg w"><b>Aviso</b> (linha ${CODE.stmtLine[w.si] + 1}): ${w.msg}<pre>${esc(w.cc)}</pre></div>`).join('')}</div>`;
+  $('explain').innerHTML = h;
+  // CPU
+  $('regs').innerHTML = S.regs.map((r, i) => `<div class="reg${r ? '' : ' empty'}${ch.regs.has(i) ? ' flash' : ''}" id="reg${i}"><div class="rn"><b>R${i}</b><span>${r ? tname(r.type) : 'vazio'}</span></div><div class="rv">${r ? esc(fmtVal(r.type, r.v, BASE)) : '—'}</div></div>`).join('');
+  $('aluShape').textContent = S.alu ? S.alu.sym : 'ULA';
+  $('aluTxt').innerHTML = S.alu ? `<small>última operação</small>${esc(S.alu.text)}` : '<small>Unidade Lógica e Aritmética</small>aguardando';
+  $('asmCur').textContent = k ? asmOf(last) : '—';
+  $('asmNext').textContent = COMP.errors.length || S.error ? '—' : asmOf(ops[k]) ;
+  // saída
+  $('out').innerHTML = esc(S.out) + '<span class="cur"></span>';
+  $('out').scrollTop = 1e6;
+  drawMem(ch);
+  $('cnt').textContent = `passo ${k} / ${ops.length}`;
+  const dead = !!COMP.errors.length;
+  $('bReset').disabled = $('bBack').disabled = busy || k === 0;
+  $('bNext').disabled = $('bEnd').disabled = dead || busy || k >= ops.length || !!S.error;
+  $('bPlay').disabled = dead || ((k >= ops.length || !!S.error) && !playing);
+  $('playLbl').textContent = playing ? 'Pausar' : 'Executar';
+  $('playIco').innerHTML = playing ? '<path d="M6 5h4v14H6zM14 5h4v14h-4z"/>' : '<path d="M4 5v14l8-7zM12 5v14l8-7z"/>';
+}
+function drawMem(ch) {
+  const N = S.mem.length, start = {};
+  COMP.order.forEach(v => { if (S.alloc.has(v.name)) start[v.addr - BASEADDR] = v; });
+  const cell = i => {
+    const st = S.cell[i], b = S.mem[i];
+    const txt = st === 'free' ? '··' : st === 'unk' ? '?' : st === 'pad' ? '' : byteStr(b);
+    return `<div class="cell ${st}${ch.bytes.has(i) ? ' flash' : ''}" title="${hexA(BASEADDR + i)}"><small>${hx(BASEADDR + i, 4)}</small><b>${txt}</b></div>`;
+  };
+  let h = '';
+  for (let r = 0; r < N / 8; r++) {
+    h += `<div class="mrow"><div class="maddr">${hexA(BASEADDR + r * 8)}</div><div class="cells">`;
+    for (let i = r * 8; i < r * 8 + 8;) {
+      const v = start[i];
+      if (v) {
+        let c = ''; for (let j = 0; j < v.size; j++) c += cell(i + j);
+        h += `<div class="vb${ch.vars.has(v.name) && S.ch && S.ch.vars.has(v.name) && !S.init.has(v.name) ? ' appear' : ''}" id="vb-${v.name}" style="--c:${v.color}"><span class="vlab">${v.name}<em>${tname(v.type)}</em></span>${c}</div>`;
+        i += v.size;
+      } else { h += cell(i); i++; }
+    }
+    h += '</div></div>';
+  }
+  const m = $('mem'); m.className = 'b-' + BASE; m.innerHTML = h;
+  $('memInfo').textContent = `${N} bytes · ${LITTLE ? 'little' : 'big'}-endian`;
+  const vs = COMP.order.filter(v => S.alloc.has(v.name));
+  $('vtab').innerHTML = vs.length ? `<table class="stack"><thead><tr><th>Variável</th><th>Tipo</th><th>Bytes</th><th>Endereço</th><th>Valor</th></tr></thead><tbody>${vs.map(v => {
+    const val = S.init.has(v.name) ? esc(fmtVal(v.type, readVar(S, v), BASE)) : J() ? '<span style="color:var(--mute)">sem valor</span>' : `<span style="color:var(--bad)">lixo: ${esc(fmtVal(v.type, readVar(S, v), BASE))}</span>`;
+    return `<tr${ch.vars.has(v.name) ? ' class="flash"' : ''}><td><span class="dot" style="background:${v.color}"></span><b>${v.name}</b></td><td class="n">${tname(v.type)}</td><td class="n">${v.size}</td><td class="n">${range(v.addr, v.size)}</td><td class="n">${val}</td></tr>`;
+  }).join('')}</tbody></table>` : '<div class="empty-note">Nenhuma variável alocada ainda. As variáveis aparecem aqui quando a declaração for executada.</div>';
+}
+
+/* ---------- animação ---------- */
+const MULT = [0, .45, .7, 1, 1.6, 2.6];
+const RM = matchMedia('(prefers-reduced-motion: reduce)');
+const dur = () => RM.matches ? 0 : 700 / MULT[+$('spd').value];
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+function fly(from, to, text, color) {
+  const d = dur(); if (!d || !from || !to) return Promise.resolve();
+  const a = from.getBoundingClientRect(), b = to.getBoundingClientRect();
+  const c = document.createElement('div'); c.className = 'chip'; c.textContent = text;
+  if (color) c.style.setProperty('--cc', color);
+  document.body.appendChild(c);
+  const w = c.offsetWidth, h = c.offsetHeight;
+  const x0 = a.left + a.width / 2 - w / 2, y0 = a.top + a.height / 2 - h / 2, x1 = b.left + b.width / 2 - w / 2, y1 = b.top + b.height / 2 - h / 2;
+  const an = c.animate([{transform:`translate(${x0}px,${y0}px) scale(.6)`, opacity:0}, {transform:`translate(${x0}px,${y0}px) scale(1)`, opacity:1, offset:.18}, {transform:`translate(${x1}px,${y1}px) scale(1)`, opacity:1, offset:.92}, {transform:`translate(${x1}px,${y1}px) scale(.8)`, opacity:0}], {duration:d * 1.25, easing:'ease-in-out'});
+  return an.finished.then(() => c.remove(), () => c.remove());
+}
+const pulse = el => { if (!el || !dur()) return; el.classList.remove('pulse'); void el.offsetWidth; el.classList.add('pulse'); };
+async function animate(op) {
+  const reg = i => $('reg' + i), alu = $('aluShape'), vb = n => $('vb-' + n), line = $('cl-' + lineOf(op)), V = op.v && COMP.vars[op.v];
+  const vt = r => fmtVal(r.type, r.v, BASE);
+  switch (op.t) {
+    case 'LOADV': await fly(vb(op.v), reg(op.r), fmtVal(V.type, readVar(S, V), BASE), V.color); break;
+    case 'LOADI': await fly(line, reg(op.r), fmtVal(op.type, op.value, BASE)); break;
+    case 'ALU': case 'NEG': {
+      const ins = op.t === 'ALU' ? [fly(reg(op.a), alu, vt(S.regs[op.a])), fly(reg(op.b), alu, vt(S.regs[op.b]))] : [fly(reg(op.r), alu, vt(S.regs[op.r]))];
+      await Promise.all(ins);
+      const tmp = cloneS(S); applyOp(tmp, op);
+      $('aluShape').textContent = tmp.alu.sym; $('aluTxt').innerHTML = `<small>calculando…</small>${esc(tmp.alu.text)}`; pulse(alu);
+      await sleep(dur() * .6);
+      if (!tmp.error) await fly(alu, reg(op.t === 'ALU' ? op.d : op.r), vt(tmp.regs[op.t === 'ALU' ? op.d : op.r]));
+      break;
+    }
+    case 'CVT': pulse(reg(op.r)); await sleep(dur() * .6); break;
+    case 'STORE': await fly(reg(op.r), vb(op.v), vt(S.regs[op.r]), V.color); break;
+    case 'OUTV': await fly(reg(op.r), $('out'), fmtOut(S.regs[op.r].type, S.regs[op.r].v)); break;
+    case 'OUTS': await fly(line, $('out'), '"' + op.str.replace(/\n/g, '\\n') + '"'); break;
+    default: await sleep(dur() * .3);
+  }
+}
+async function step() {
+  if (busy || COMP.errors.length || k >= COMP.ops.length || S.error) return;
+  busy = true; const op = COMP.ops[k];
+  setCur(lineOf(op));
+  try { await animate(op); } catch (e) {}
+  applyOp(S, op); k++; busy = false; render(true);
+}
+function go(n) {
+  playing = false;
+  S = newState(); k = 0;
+  if (!COMP.errors.length) { n = Math.min(n, COMP.ops.length); while (k < n && !S.error) applyOp(S, COMP.ops[k++]); }
+  render(false);
+}
+async function play() {
+  if (playing) { playing = false; render(false); return; }
+  if (k >= COMP.ops.length || S.error) return;
+  playing = true; render(false);
+  while (playing && k < COMP.ops.length && !S.error) { await step(); if (playing) await sleep(dur() * .35 + 60); }
+  playing = false; render(false);
+}
+
+/* ---------- montagem ---------- */
+function rebuild(keep) {
+  STM = parseSource(SRC);
+  CODE = codegen(STM); COMP = compile(STM);
+  drawCode(); go(keep ? k : 0);
+}
+function seg(id, items, get, set) {
+  const el = $(id);
+  const draw = () => el.innerHTML = items.map(([v, l]) => `<button data-v="${v}" aria-pressed="${get() === v}">${l}</button>`).join('');
+  el.addEventListener('click', e => { const b = e.target.closest('button'); if (!b || busy) return; set(b.dataset.v); draw(); save(); });
+  draw();
+}
+seg('langSeg', [['c','C'], ['cpp','C++'], ['java','Java'], ['cs','C#']], () => LANG, v => { LANG = v; rebuild(true); });
+seg('baseSeg', [['bin','Bin'], ['dec','Dec'], ['hex','Hex']], () => BASE, v => { BASE = v; render(false); });
+const exSel = $('exSel');
+const drawEx = () => { exSel.innerHTML = EX.map((e, i) => `<option value="${i}">${esc(e.n)}</option>`).join('') + (exIdx < 0 ? '<option value="-1">Programa personalizado</option>' : ''); exSel.value = exIdx; };
+drawEx();
+exSel.addEventListener('change', () => { if (busy) { exSel.value = exIdx; return; } exIdx = +exSel.value; if (exIdx >= 0) SRC = EX[exIdx].s; drawEx(); save(); rebuild(false); });
+$('endSel').addEventListener('change', e => { if (busy) return; LITTLE = e.target.value === 'le'; go(k); });
+$('bNext').onclick = step;
+$('bBack').onclick = () => { if (!busy && k > 0) go(k - 1); };
+$('bReset').onclick = () => { if (!busy) go(0); };
+$('bEnd').onclick = () => { if (!busy) go(COMP.ops.length); };
+$('bPlay').onclick = play;
+document.addEventListener('keydown', e => {
+  if ($('ov').classList.contains('on') || /INPUT|SELECT|TEXTAREA|BUTTON/.test(e.target.tagName) && e.key === ' ') return;
+  if (e.key === 'ArrowRight') { e.preventDefault(); step(); }
+  else if (e.key === 'ArrowLeft') { e.preventDefault(); $('bBack').onclick(); }
+  else if (e.key === ' ') { e.preventDefault(); play(); }
+  else if (e.key === 'Home') $('bReset').onclick();
+  else if (e.key === 'End') $('bEnd').onclick();
+});
+// editor
+const ov = $('ov'), ed = $('ed');
+$('editBtn').onclick = () => { if (busy) return; playing = false; ed.value = SRC; $('perr').textContent = ''; ov.classList.add('on'); ed.focus(); };
+$('edCancel').onclick = () => ov.classList.remove('on');
+ov.addEventListener('keydown', e => { if (e.key === 'Escape') ov.classList.remove('on'); if (e.key === 'Tab' && e.target === ed) { e.preventDefault(); ed.setRangeText('    ', ed.selectionStart, ed.selectionEnd, 'end'); } });
+$('edOk').onclick = () => {
+  try { parseSource(ed.value); } catch (e) { $('perr').textContent = `Linha ${e.line || '?'}: ${e.message}`; return; }
+  SRC = ed.value; const m = EX.findIndex(x => x.s === SRC); exIdx = m; drawEx(); save();
+  ov.classList.remove('on'); rebuild(false);
+};
+try { rebuild(false); } catch (e) { SRC = EX[0].s; exIdx = 0; drawEx(); rebuild(false); }
+}
+</script>
+</body>
+</html>
