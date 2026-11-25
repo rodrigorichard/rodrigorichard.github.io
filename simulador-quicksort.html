@@ -1,0 +1,1207 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Simulador de Quicksort</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+/* VOICE: material de aula da PUC Minas, mesmo padrão dos simuladores de ABP e de fila.
+   IDEA: o teste de mesa do Quicksort: o código na linguagem escolhida, o vetor com i, j, esq, dir e o pivô, a pilha e a árvore de recursão.
+   PICTURE: o vetor em barras, com as trocas animadas e a partição marcada.
+   COLOUR and TYPE: azul-marinho e dourado do template das aulas; laranja para i e para o que está acontecendo agora; roxo para j.
+   LAYOUT: operações, player fixo, código à esquerda e vetor + memória à direita. */
+:root{color-scheme:light dark;
+ --bg:light-dark(#f6f7f9,#0e1522);--card:light-dark(#fff,#16202f);--ink:light-dark(#18202b,#e6ebf2);--mute:light-dark(#5b6573,#9aa6b6);
+ --navy:#0b2d5b;--navyink:light-dark(#0b2d5b,#a9c3e8);--gold:#c9a227;--goldcl:light-dark(#fdf6dd,#2e2810);--line:light-dark(#d9dfe8,#2a3647);
+ --no:light-dark(#e8eef7,#1d2c44);--noborda:light-dark(#0b2d5b,#7fa3d6);
+ --lar:#d9822b;--larcl:light-dark(#fcebd9,#3a2a16);--verde:#2e7d4f;--verdecl:light-dark(#dff2e6,#173323);
+ --verm:#b3261e;--roxo:light-dark(#6b3fa0,#b48fe0);--roxocl:light-dark(#eee6f7,#2a1f3a);
+ --codebg:light-dark(#f3f5f8,#101826);--barra:light-dark(#8db3d9,#3e6596)}
+:root[data-theme=light]{color-scheme:light}:root[data-theme=dark]{color-scheme:dark}
+*{box-sizing:border-box;min-width:0}
+[hidden]{display:none!important}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 "Source Sans 3",system-ui,sans-serif;overflow-x:clip}
+header{background:var(--navy);color:#fff;border-bottom:4px solid var(--gold);padding:14px max(3vw,14px)}
+header h1{margin:0;font-size:clamp(22px,3vw,30px);line-height:1.1}
+header p{margin:4px 0 0;color:#c8d6ea;font-size:15px}
+header a{color:#fff}
+main{padding:14px max(3vw,14px) 40px;max-width:1500px;margin:auto}
+code{font-family:"JetBrains Mono",monospace;font-size:.9em}
+.ops{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+.grp{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.grp+.grp{border-left:1px solid var(--line);padding-left:14px}
+.lb{font-size:14px;color:var(--mute)}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.seg button{border:0;border-radius:0;min-width:64px}
+.seg button+button{border-left:1px solid var(--line)}
+.seg button[aria-pressed=true]{background:var(--navy);color:#fff}
+input[type=text]{font:15px "JetBrains Mono",monospace;width:17em;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink)}
+button,select{font:600 15px "Source Sans 3",sans-serif;min-height:40px;padding:6px 12px;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer}
+button:hover{border-color:var(--navyink)}
+button.pri{background:var(--navy);color:#fff;border-color:var(--navy)}
+button.pri:hover{background:#123f7d}
+button:focus-visible,select:focus-visible,input:focus-visible{outline:3px solid var(--gold);outline-offset:1px}
+button:disabled{opacity:.45;cursor:default}
+.dica{margin:6px 2px 0;font-size:14px;color:var(--mute)}
+.analise{margin-top:10px;padding:8px 12px;border-radius:8px;background:var(--goldcl);border-left:4px solid var(--gold);font-size:15px}
+.analise.pior{background:light-dark(#fcedec,#3b1a18);border-left-color:var(--verm)}
+.player{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:8px 12px;position:sticky;top:0;z-index:5;box-shadow:0 4px 14px rgba(11,45,91,.12)}
+.player input[type=range]{flex:1 1 200px;accent-color:var(--navy);min-height:40px}
+.cont{font:14px "JetBrains Mono",monospace;color:var(--mute);white-space:nowrap}
+.palco{display:grid;grid-template-columns:minmax(0,5fr) minmax(0,7fr);gap:14px;margin-top:14px;align-items:start}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.tit{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--line);font-weight:700;color:var(--navyink);font-size:15px}
+.tit small{font-weight:400;color:var(--mute)}
+pre.cod{margin:0;padding:8px 0;background:var(--codebg);font:13.5px/1.65 "JetBrains Mono",monospace;overflow:auto}
+pre.cod div{padding:0 12px 0 10px;border-left:4px solid transparent;white-space:pre}
+pre.cod div.at{background:var(--larcl);border-left-color:var(--lar)}
+pre.cod div.esp{background:var(--no);border-left-color:var(--noborda)}
+pre.cod .n{display:inline-block;width:2.2em;color:var(--mute);opacity:.6;user-select:none}
+.kw{color:light-dark(#0b2d5b,#8fb5ec);font-weight:600}.nu{color:light-dark(#1750eb,#9ab8ff)}
+/* vetor */
+.vet{position:relative;height:318px;margin:8px 12px 0}
+.cel{position:absolute;top:0;height:200px;transition:transform .45s ease}
+.cel .bar{position:absolute;bottom:34px;left:12%;right:12%;background:var(--barra);border-radius:4px 4px 0 0;transition:height .3s,background .2s}
+.cel .val{position:absolute;bottom:0;left:6%;right:6%;height:30px;border:2px solid var(--noborda);border-radius:6px;background:var(--card);display:grid;place-items:center;font:700 15px "JetBrains Mono",monospace;transition:background .2s,border-color .2s}
+.cel.fora{opacity:.32}
+.cel.concl .bar{background:var(--verde)}.cel.concl .val{border-color:var(--verde);background:var(--verdecl)}
+.cel.cmp .val{border-color:var(--lar);background:var(--larcl);box-shadow:0 0 0 3px var(--larcl)}
+.cel.troca .val{border-color:var(--roxo);background:var(--roxocl);box-shadow:0 0 0 3px var(--roxocl)}
+.cel.cand .val{border-color:var(--gold);border-style:dashed}
+.cel.piv .val{border-color:var(--gold);background:var(--goldcl);box-shadow:0 0 0 3px var(--gold)}
+.cel.fixo .val{border:3px solid var(--verde);background:var(--goldcl);box-shadow:none}
+.cel.fixo .val::after{content:"✓";position:absolute;top:-9px;right:-7px;width:17px;height:17px;border-radius:50%;background:var(--verde);color:#fff;font:700 11px/17px "Source Sans 3",sans-serif;text-align:center}
+.idx{position:absolute;top:204px;font:12px "JetBrains Mono",monospace;color:var(--mute);text-align:center}
+.ptr{position:absolute;font:700 13px "JetBrains Mono",monospace;text-align:center;transition:transform .35s ease;line-height:1.05}
+.ptr b{display:block;font-size:12px}
+.ptr.i{color:var(--lar)}.ptr.j{color:var(--roxo)}.ptr.esq,.ptr.dir{color:var(--navyink)}
+.pivl{position:absolute;border-top:2px dashed var(--gold);transition:all .3s}
+.pivl span{position:absolute;left:0;top:-22px;font:700 12px "JetBrains Mono",monospace;color:light-dark(#7a6110,#e6c55a);background:var(--card);padding:0 4px;white-space:nowrap}
+.part{position:absolute;height:20px;border-radius:4px;font:600 12px "Source Sans 3",sans-serif;display:grid;place-items:center;white-space:nowrap;overflow:hidden}
+.part.e{background:var(--no);color:var(--navyink)}.part.d{background:var(--goldcl);color:light-dark(#7a6110,#e6c55a)}
+.nota{margin:10px 12px;padding:9px 12px;border-radius:8px;background:var(--larcl);border-left:4px solid var(--lar);min-height:46px}
+.nota.fim{background:var(--verdecl);border-left-color:var(--verde)}
+.baixo{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.2fr);border-top:1px solid var(--line)}
+.baixo>div{padding:8px 12px 12px}
+.baixo>div+div{border-left:1px solid var(--line)}
+.baixo h3{margin:0 0 6px;font:700 13px "Source Sans 3",sans-serif;color:var(--mute)}
+.fr{display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:4px 6px;margin-top:4px;border:1px solid var(--line);border-radius:6px;font:13px "JetBrains Mono",monospace}
+.fr.top{border-color:var(--lar);background:var(--larcl)}
+.fr .nm{flex:1 1 100%;color:var(--mute);font-size:12px}
+.fr.top .nm{color:var(--ink)}
+.c{border:1px solid var(--noborda);background:var(--card);padding:0 6px;border-radius:3px}
+.c i{font-style:normal;color:var(--mute)}
+#arvRec{width:100%;height:auto;display:block}
+.cont3{display:flex;flex-wrap:wrap;gap:8px 18px;margin-top:10px;font-size:15px}
+.cont3 b{font:700 18px "JetBrains Mono",monospace;color:var(--navyink)}
+.leg{display:flex;flex-wrap:wrap;gap:14px;font-size:14px;color:var(--mute);margin-top:10px;align-items:center}
+.leg span{display:inline-flex;align-items:center;gap:6px}
+.leg i{display:inline-block;width:16px;height:16px;border-radius:4px;border:2px solid}
+footer{max-width:1500px;margin:auto;padding:0 max(3vw,14px) 28px;color:var(--mute);font-size:14px}
+@media(max-width:1000px){.palco{grid-template-columns:minmax(0,1fr)}.cardcod{order:2}}
+@media(max-width:600px){.player{position:static}.grp+.grp{border-left:0;padding-left:0}.baixo{grid-template-columns:minmax(0,1fr)}.baixo>div+div{border-left:0;border-top:1px solid var(--line)}input[type=text]{width:100%}.vet{height:280px}.cel .val{font-size:12px}}
+@media(prefers-reduced-motion:reduce){.cel,.ptr,.pivl,.cel .bar{transition:none}}
+</style>
+</head>
+<body>
+<header>
+  <h1>Simulador de Quicksort</h1>
+  <p>Algoritmos e Estruturas de Dados · PUC Minas · o teste de mesa do Quicksort (partição de Hoare, Lomuto ou Sedgewick), linha a linha, em C, Java, C# ou Python · <a href="index.html">todos os simuladores</a></p>
+</header>
+<main>
+  <div class="ops" role="group" aria-label="Opções">
+    <div class="grp">
+      <span class="lb">Linguagem</span>
+      <div class="seg" id="langs" role="group" aria-label="Linguagem do código">
+        <button type="button" data-l="c">C</button><button type="button" data-l="java">Java</button><button type="button" data-l="cs">C#</button><button type="button" data-l="py">Python</button>
+      </div>
+    </div>
+    <div class="grp">
+      <label class="lb" for="tam">Tamanho</label>
+      <select id="tam"><option value="6">6</option><option value="8">8</option><option value="10" selected>10</option><option value="12">12</option><option value="14">14</option><option value="16">16</option></select>
+      <label class="lb" for="ordem">Ordem inicial</label>
+      <select id="ordem"><option value="aleatoria" selected>Sem ordenação</option><option value="crescente">Crescente</option><option value="decrescente">Decrescente</option></select>
+      <label class="lb" for="part">Partição</label>
+      <select id="part"><option value="hoare" selected>Hoare</option><option value="lomuto">Lomuto</option><option value="sedgewick">Sedgewick</option></select>
+      <label class="lb" for="piv">Pivô</label>
+      <select id="piv"><option value="meio" selected>Elemento do meio</option><option value="primeiro">Primeiro elemento</option><option value="ultimo">Último elemento</option><option value="mediana">Mediana de três</option><option value="aleatorio">Aleatório</option></select>
+      <button type="button" class="pri" id="bGerar">Gerar vetor</button>
+    </div>
+    <div class="grp">
+      <label class="lb" for="vetor">ou digite</label>
+      <input type="text" id="vetor" autocomplete="off" inputmode="numeric" aria-describedby="dicavet">
+      <button type="button" id="bUsar">Ordenar este</button>
+    </div>
+  </div>
+  <div class="analise" id="analise" aria-live="polite"></div>
+  <p class="dica" id="dicavet">Escolha tamanho, ordem inicial, partição e pivô e clique em <b>Gerar vetor</b>, ou digite de 2 a 16 inteiros entre 0 e 99. Trocar a linguagem, a partição ou o pivô não muda o vetor. Use <b>←</b> e <b>→</b> para voltar e avançar.</p>
+
+  <div class="player" role="group" aria-label="Controle dos passos">
+    <button id="pIni" type="button" title="Primeiro passo" aria-label="Primeiro passo">⏮</button>
+    <button id="pAnt" type="button" title="Passo anterior (←)" aria-label="Passo anterior">◀</button>
+    <button id="pPlay" type="button" class="pri" title="Executar / pausar" aria-label="Executar ou pausar" style="min-width:150px">▶ Executar</button>
+    <button id="pPro" type="button" title="Próximo passo (→)" aria-label="Próximo passo">▶|</button>
+    <button id="pFim" type="button" title="Último passo" aria-label="Último passo">⏭</button>
+    <input type="range" id="barra" min="0" value="0" aria-label="Passo da execução">
+    <span class="cont" id="contador"></span>
+    <select id="modo" aria-label="Modo de execução"><option value="auto">Execução automática</option><option value="manual">Um passo por clique</option></select>
+    <select id="vel" aria-label="Velocidade"><option value="2000">0,5×</option><option value="1100" selected>1×</option><option value="550">2×</option><option value="250">4×</option></select>
+  </div>
+
+  <div class="palco">
+    <section class="card cardcod" aria-label="Código">
+      <div class="tit"><span>Chamada inicial</span><small id="arq1"></small></div>
+      <pre class="cod" id="codCham"></pre>
+      <div class="tit" style="border-top:1px solid var(--line)"><span>Função quicksort</span><small id="arq2"></small></div>
+      <pre class="cod" id="codFunc"></pre>
+    </section>
+    <section class="card" aria-label="Vetor e memória">
+      <div class="tit"><span>Vetor</span><small id="trecho"></small></div>
+      <div class="vet" id="vet" role="img" aria-label="Vetor sendo ordenado"></div>
+      <div class="nota" id="nota" aria-live="polite"></div>
+      <div class="baixo">
+        <div><h3>Pilha de chamadas (topo embaixo)</h3><div id="pilha"></div></div>
+        <div><h3>Árvore de recursão</h3><svg id="arvRec" role="img" aria-label="Árvore das chamadas recursivas"></svg>
+          <div class="cont3"><span>comparações com o pivô <b id="kComp">0</b></span><span>trocas <b id="kTro">0</b></span><span>chamadas <b id="kCha">0</b></span></div></div>
+      </div>
+    </section>
+  </div>
+  <div class="leg">
+    <span><i style="background:var(--goldcl);border-color:var(--gold)"></i>pivô</span>
+    <span><i style="background:var(--card);border-color:var(--gold);border-style:dashed"></i>candidatos da mediana de três</span>
+    <span><i style="background:var(--goldcl);border-color:var(--verde);border-width:3px"></i>pivô na posição final ✓ (Lomuto e Sedgewick)</span>
+    <span><i style="background:var(--larcl);border-color:var(--lar)"></i>comparação</span>
+    <span><i style="background:var(--roxocl);border-color:var(--roxo)"></i>troca</span>
+    <span><i style="background:var(--verdecl);border-color:var(--verde)"></i>trecho já ordenado</span>
+    <span><i style="background:var(--card);border-color:var(--noborda);opacity:.4"></i>fora do trecho da chamada atual</span>
+    <span><i style="background:var(--no);border-color:var(--noborda)"></i>linha que espera a chamada recursiva</span>
+  </div>
+</main>
+<footer>Algoritmos e Estruturas de Dados · PUC Minas · Prof. Rodrigo Richard Gomes · os códigos nas quatro linguagens foram compilados e testados</footer>
+<script>
+/* Núcleo do simulador de Quicksort: código nas 4 linguagens + geração dos passos */
+const CODIGO = {
+  c: {
+    nome: 'C', arquivo: 'quicksort.c',
+    chamada: `int array[] = { ... };
+int n = sizeof(array) / sizeof(array[0]);
+quicksort(array, 0, n - 1);`,
+    func: `void quicksort(int array[], int esq, int dir) {
+    int i = esq, j = dir;
+    {PIVO}
+    while (i <= j) {
+        while (array[i] < pivo)
+            i++;
+        while (array[j] > pivo)
+            j--;
+        if (i <= j) {
+            int temp = array[i];
+            array[i] = array[j];
+            array[j] = temp;
+            i++;
+            j--;
+        }
+    }
+    if (esq < j)
+        quicksort(array, esq, j);
+    if (i < dir)
+        quicksort(array, i, dir);
+}`
+  },
+  java: {
+    nome: 'Java', arquivo: 'Quicksort.java',
+    chamada: `int[] array = { ... };
+quicksort(array, 0, array.length - 1);`,
+    func: `static void quicksort(int[] array, int esq, int dir) {
+    int i = esq, j = dir;
+    {PIVO}
+    while (i <= j) {
+        while (array[i] < pivo)
+            i++;
+        while (array[j] > pivo)
+            j--;
+        if (i <= j) {
+            int temp = array[i];
+            array[i] = array[j];
+            array[j] = temp;
+            i++;
+            j--;
+        }
+    }
+    if (esq < j)
+        quicksort(array, esq, j);
+    if (i < dir)
+        quicksort(array, i, dir);
+}`
+  },
+  cs: {
+    nome: 'C#', arquivo: 'Program.cs',
+    chamada: `int[] array = { ... };
+Quicksort(array, 0, array.Length - 1);`,
+    func: `static void Quicksort(int[] array, int esq, int dir)
+{
+    int i = esq, j = dir;
+    {PIVO}
+    while (i <= j)
+    {
+        while (array[i] < pivo)
+            i++;
+        while (array[j] > pivo)
+            j--;
+        if (i <= j)
+        {
+            int temp = array[i];
+            array[i] = array[j];
+            array[j] = temp;
+            i++;
+            j--;
+        }
+    }
+    if (esq < j)
+        Quicksort(array, esq, j);
+    if (i < dir)
+        Quicksort(array, i, dir);
+}`
+  },
+  py: {
+    nome: 'Python', arquivo: 'quicksort.py',
+    chamada: `array = [ ... ]
+quicksort(array, 0, len(array) - 1)`,
+    func: `def quicksort(array, esq, dir):
+    i, j = esq, dir
+    {PIVO}
+    while i <= j:
+        while array[i] < pivo:
+            i += 1
+        while array[j] > pivo:
+            j -= 1
+        if i <= j:
+            array[i], array[j] = array[j], array[i]
+            i += 1
+            j -= 1
+    if esq < j:
+        quicksort(array, esq, j)
+    if i < dir:
+        quicksort(array, i, dir)`
+  }
+};
+
+/* tipos de pivô */
+const PIVOS = {
+  meio: { nome: 'Elemento do meio' },
+  primeiro: { nome: 'Primeiro elemento' },
+  ultimo: { nome: 'Último elemento' },
+  mediana: { nome: 'Mediana de três' },
+  aleatorio: { nome: 'Aleatório' }
+};
+const LINHA_PIVO = {
+  c: { meio: 'int pivo = array[(esq + dir) / 2];', primeiro: 'int pivo = array[esq];', ultimo: 'int pivo = array[dir];',
+       mediana: 'int pivo = mediana(array[esq], array[(esq + dir) / 2], array[dir]);', aleatorio: 'int pivo = array[esq + rand() % (dir - esq + 1)];' },
+  java: { meio: 'int pivo = array[(esq + dir) / 2];', primeiro: 'int pivo = array[esq];', ultimo: 'int pivo = array[dir];',
+       mediana: 'int pivo = mediana(array[esq], array[(esq + dir) / 2], array[dir]);', aleatorio: 'int pivo = array[esq + rnd.nextInt(dir - esq + 1)];' },
+  cs: { meio: 'int pivo = array[(esq + dir) / 2];', primeiro: 'int pivo = array[esq];', ultimo: 'int pivo = array[dir];',
+       mediana: 'int pivo = Mediana(array[esq], array[(esq + dir) / 2], array[dir]);', aleatorio: 'int pivo = array[Random.Shared.Next(esq, dir + 1)];' },
+  py: { meio: 'pivo = array[(esq + dir) // 2]', primeiro: 'pivo = array[esq]', ultimo: 'pivo = array[dir]',
+       mediana: 'pivo = sorted([array[esq], array[(esq + dir) // 2], array[dir]])[1]', aleatorio: 'pivo = array[random.randint(esq, dir)]' }
+};
+const MEDIANA = {
+  c: `
+
+int mediana(int a, int b, int c) {
+    if ((a <= b && b <= c) || (c <= b && b <= a))
+        return b;
+    if ((b <= a && a <= c) || (c <= a && a <= b))
+        return a;
+    return c;
+}`,
+  java: `
+
+static int mediana(int a, int b, int c) {
+    if ((a <= b && b <= c) || (c <= b && b <= a))
+        return b;
+    if ((b <= a && a <= c) || (c <= a && a <= b))
+        return a;
+    return c;
+}`,
+  cs: `
+
+static int Mediana(int a, int b, int c)
+{
+    if ((a <= b && b <= c) || (c <= b && b <= a))
+        return b;
+    if ((b <= a && a <= c) || (c <= a && a <= b))
+        return a;
+    return c;
+}`
+};
+function codigo(lang, piv, part = 'hoare') {
+  if (part === 'lomuto') return codigoL(lang, piv);
+  if (part === 'sedgewick') return codigoS(lang, piv);
+  const B = CODIGO[lang];
+  let func = B.func.replace('{PIVO}', LINHA_PIVO[lang][piv]);
+  let chamada = B.chamada;
+  if (piv === 'mediana' && MEDIANA[lang]) func = lang === 'c' ? MEDIANA.c.trim() + '\n\n' + func : func + MEDIANA[lang];
+  if (piv === 'aleatorio') {
+    if (lang === 'java') func = 'static Random rnd = new Random();   // import java.util.Random;\n\n' + func;
+    if (lang === 'py') func = 'import random\n\n' + func;
+    if (lang === 'c') chamada = 'srand(time(NULL));   // #include <stdlib.h> e <time.h>\n' + chamada;
+  }
+  return { ...B, func, chamada };
+}
+
+
+/* ---------- partição de Lomuto ---------- */
+const LOMUTO = {
+  c: {
+    troca: `void troca(int array[], int a, int b) {
+    int temp = array[a];
+    array[a] = array[b];
+    array[b] = temp;
+}`,
+    func: `void quicksort(int array[], int esq, int dir) {
+{ESC}    int pivo = array[dir];
+    int i = esq - 1;
+    for (int j = esq; j < dir; j++) {
+        if (array[j] <= pivo) {
+            i++;
+            troca(array, i, j);
+        }
+    }
+    int p = i + 1;
+    troca(array, p, dir);   // o pivô vai para a posição final
+    if (esq < p - 1)
+        quicksort(array, esq, p - 1);
+    if (p + 1 < dir)
+        quicksort(array, p + 1, dir);
+}`,
+    med: `int indiceMediana(int array[], int esq, int dir) {
+    int m = (esq + dir) / 2;
+    int a = array[esq], b = array[m], c = array[dir];
+    if ((a <= b && b <= c) || (c <= b && b <= a))
+        return m;
+    if ((b <= a && a <= c) || (c <= a && a <= b))
+        return esq;
+    return dir;
+}`
+  },
+  java: {
+    troca: `static void troca(int[] array, int a, int b) {
+    int temp = array[a];
+    array[a] = array[b];
+    array[b] = temp;
+}`,
+    func: `static void quicksort(int[] array, int esq, int dir) {
+{ESC}    int pivo = array[dir];
+    int i = esq - 1;
+    for (int j = esq; j < dir; j++) {
+        if (array[j] <= pivo) {
+            i++;
+            troca(array, i, j);
+        }
+    }
+    int p = i + 1;
+    troca(array, p, dir);   // o pivô vai para a posição final
+    if (esq < p - 1)
+        quicksort(array, esq, p - 1);
+    if (p + 1 < dir)
+        quicksort(array, p + 1, dir);
+}`,
+    med: `static int indiceMediana(int[] array, int esq, int dir) {
+    int m = (esq + dir) / 2;
+    int a = array[esq], b = array[m], c = array[dir];
+    if ((a <= b && b <= c) || (c <= b && b <= a))
+        return m;
+    if ((b <= a && a <= c) || (c <= a && a <= b))
+        return esq;
+    return dir;
+}`
+  },
+  cs: {
+    troca: `static void Troca(int[] array, int a, int b)
+{
+    int temp = array[a];
+    array[a] = array[b];
+    array[b] = temp;
+}`,
+    func: `static void Quicksort(int[] array, int esq, int dir)
+{
+{ESC}    int pivo = array[dir];
+    int i = esq - 1;
+    for (int j = esq; j < dir; j++)
+    {
+        if (array[j] <= pivo)
+        {
+            i++;
+            Troca(array, i, j);
+        }
+    }
+    int p = i + 1;
+    Troca(array, p, dir);   // o pivô vai para a posição final
+    if (esq < p - 1)
+        Quicksort(array, esq, p - 1);
+    if (p + 1 < dir)
+        Quicksort(array, p + 1, dir);
+}`,
+    med: `static int IndiceMediana(int[] array, int esq, int dir)
+{
+    int m = (esq + dir) / 2;
+    int a = array[esq], b = array[m], c = array[dir];
+    if ((a <= b && b <= c) || (c <= b && b <= a))
+        return m;
+    if ((b <= a && a <= c) || (c <= a && a <= b))
+        return esq;
+    return dir;
+}`
+  },
+  py: {
+    func: `def quicksort(array, esq, dir):
+{ESC}    pivo = array[dir]
+    i = esq - 1
+    for j in range(esq, dir):
+        if array[j] <= pivo:
+            i += 1
+            array[i], array[j] = array[j], array[i]
+    p = i + 1
+    array[p], array[dir] = array[dir], array[p]  # posição final
+    if esq < p - 1:
+        quicksort(array, esq, p - 1)
+    if p + 1 < dir:
+        quicksort(array, p + 1, dir)`,
+    med: `def indice_mediana(array, esq, dir):
+    m = (esq + dir) // 2
+    a, b, c = array[esq], array[m], array[dir]
+    if a <= b <= c or c <= b <= a:
+        return m
+    if b <= a <= c or c <= a <= b:
+        return esq
+    return dir`
+  }
+};
+const ESC_M = {
+  c: { meio: 'int m = (esq + dir) / 2;', primeiro: 'int m = esq;', mediana: 'int m = indiceMediana(array, esq, dir);', aleatorio: 'int m = esq + rand() % (dir - esq + 1);' },
+  java: { meio: 'int m = (esq + dir) / 2;', primeiro: 'int m = esq;', mediana: 'int m = indiceMediana(array, esq, dir);', aleatorio: 'int m = esq + rnd.nextInt(dir - esq + 1);' },
+  cs: { meio: 'int m = (esq + dir) / 2;', primeiro: 'int m = esq;', mediana: 'int m = IndiceMediana(array, esq, dir);', aleatorio: 'int m = Random.Shared.Next(esq, dir + 1);' },
+  py: { meio: 'm = (esq + dir) // 2', primeiro: 'm = esq', mediana: 'm = indice_mediana(array, esq, dir)', aleatorio: 'm = random.randint(esq, dir)' }
+};
+const LEVA = { c: 'troca(array, m, dir);     // leva o pivô para o fim', java: 'troca(array, m, dir);     // leva o pivô para o fim', cs: 'Troca(array, m, dir);     // leva o pivô para o fim', py: 'array[m], array[dir] = array[dir], array[m]  # leva o pivô ao fim' };
+function codigoL(lang, piv) {
+  const B = CODIGO[lang], L = LOMUTO[lang];
+  const esc = piv === 'ultimo' ? '' : `    ${ESC_M[lang][piv]}\n    ${LEVA[lang]}\n`;
+  let func = L.func.replace('{ESC}', esc);
+  let chamada = B.chamada;
+  const helpers = [L.troca, piv === 'mediana' ? L.med : null].filter(Boolean);
+  if (lang === 'c') func = helpers.join('\n\n') + '\n\n' + func;          // em C, as funções auxiliares vêm antes
+  else if (helpers.length) func = func + '\n\n' + helpers.join('\n\n');
+  if (piv === 'aleatorio') {
+    if (lang === 'java') func = 'static Random rnd = new Random();   // import java.util.Random;\n\n' + func;
+    if (lang === 'py') func = 'import random\n\n' + func;
+    if (lang === 'c') chamada = 'srand(time(NULL));   // #include <stdlib.h> e <time.h>\n' + chamada;
+  }
+  return { ...B, func, chamada };
+}
+function mapaL(lang, piv) {
+  const L = codigoL(lang, piv).func.split('\n');
+  const py = lang === 'py';
+  const sig = L.findIndex(l => l.includes(py ? 'def quicksort' : (lang === 'cs' ? 'void Quicksort(' : 'void quicksort(')));
+  const acha = (txt, n = 1) => { let c = 0; for (let k = sig; k < L.length; k++) if (L[k].includes(txt) && ++c === n) return k; throw new Error(lang + ': ' + txt); };
+  let fim = -1;
+  if (!py) { for (let k = sig + 1; k < L.length; k++) if (L[k] === '}') { fim = k; break; } }
+  return {
+    sig: [sig],
+    esc: piv === 'ultimo' ? [] : [acha(py ? 'm = ' : 'int m = ')],
+    leva: piv === 'ultimo' ? [] : [acha('leva o pivô')],
+    pivo: [acha('pivo = array[dir]')],
+    iIni: [acha('i = esq - 1')],
+    for: [acha(py ? 'for j in' : 'for (int j')],
+    se: [acha('array[j] <= pivo')],
+    inc: [acha(py ? 'i += 1' : 'i++')],
+    troca: [acha(py ? 'array[i], array[j] =' : 'roca(array, i, j)')],
+    pLinha: [acha('p = i + 1')],
+    trocaP: [acha('posição final')],
+    ifE: [acha('esq < p - 1')],
+    callE: [acha('array, esq, p - 1)')],
+    ifD: [acha('p + 1 < dir')],
+    callD: [acha('array, p + 1, dir)')],
+    fim: fim >= 0 ? [fim] : []
+  };
+}
+
+/* ---------- partição de Sedgewick ---------- */
+const SEDG = {
+  c: `void quicksort(int array[], int esq, int dir) {
+{ESC}    int pivo = array[esq];
+    int i = esq, j = dir + 1;
+    while (1) {
+        while (array[++i] < pivo)
+            if (i == dir) break;
+        while (pivo < array[--j])
+            if (j == esq) break;
+        if (i >= j) break;
+        troca(array, i, j);
+    }
+    troca(array, esq, j);   // o pivô vai para a posição final
+    if (esq < j - 1)
+        quicksort(array, esq, j - 1);
+    if (j + 1 < dir)
+        quicksort(array, j + 1, dir);
+}`,
+  java: `static void quicksort(int[] array, int esq, int dir) {
+{ESC}    int pivo = array[esq];
+    int i = esq, j = dir + 1;
+    while (true) {
+        while (array[++i] < pivo)
+            if (i == dir) break;
+        while (pivo < array[--j])
+            if (j == esq) break;
+        if (i >= j) break;
+        troca(array, i, j);
+    }
+    troca(array, esq, j);   // o pivô vai para a posição final
+    if (esq < j - 1)
+        quicksort(array, esq, j - 1);
+    if (j + 1 < dir)
+        quicksort(array, j + 1, dir);
+}`,
+  cs: `static void Quicksort(int[] array, int esq, int dir)
+{
+{ESC}    int pivo = array[esq];
+    int i = esq, j = dir + 1;
+    while (true)
+    {
+        while (array[++i] < pivo)
+            if (i == dir) break;
+        while (pivo < array[--j])
+            if (j == esq) break;
+        if (i >= j) break;
+        Troca(array, i, j);
+    }
+    Troca(array, esq, j);   // o pivô vai para a posição final
+    if (esq < j - 1)
+        Quicksort(array, esq, j - 1);
+    if (j + 1 < dir)
+        Quicksort(array, j + 1, dir);
+}`,
+  py: `def quicksort(array, esq, dir):
+{ESC}    pivo = array[esq]
+    i, j = esq, dir + 1
+    while True:
+        i += 1
+        while array[i] < pivo:
+            if i == dir:
+                break
+            i += 1
+        j -= 1
+        while pivo < array[j]:
+            if j == esq:
+                break
+            j -= 1
+        if i >= j:
+            break
+        array[i], array[j] = array[j], array[i]
+    array[esq], array[j] = array[j], array[esq]  # posição final
+    if esq < j - 1:
+        quicksort(array, esq, j - 1)
+    if j + 1 < dir:
+        quicksort(array, j + 1, dir)`
+};
+const LEVA_S = { c: 'troca(array, m, esq);     // leva o pivô para o início', java: 'troca(array, m, esq);     // leva o pivô para o início', cs: 'Troca(array, m, esq);     // leva o pivô para o início', py: 'array[m], array[esq] = array[esq], array[m]  # leva o pivô ao início' };
+const ULT_M = { c: 'int m = dir;', java: 'int m = dir;', cs: 'int m = dir;', py: 'm = dir' };
+function codigoS(lang, piv) {
+  const B = CODIGO[lang], L = LOMUTO[lang];
+  const linhaM = piv === 'ultimo' ? ULT_M[lang] : ESC_M[lang][piv];
+  const esc = piv === 'primeiro' ? '' : `    ${linhaM}\n    ${LEVA_S[lang]}\n`;
+  let func = SEDG[lang].replace('{ESC}', esc);
+  let chamada = B.chamada;
+  const helpers = [L.troca, piv === 'mediana' ? L.med : null].filter(Boolean);
+  if (lang === 'c') func = helpers.join('\n\n') + '\n\n' + func;
+  else if (helpers.length) func = func + '\n\n' + helpers.join('\n\n');
+  if (piv === 'aleatorio') {
+    if (lang === 'java') func = 'static Random rnd = new Random();   // import java.util.Random;\n\n' + func;
+    if (lang === 'py') func = 'import random\n\n' + func;
+    if (lang === 'c') chamada = 'srand(time(NULL));   // #include <stdlib.h> e <time.h>\n' + chamada;
+  }
+  return { ...B, func, chamada };
+}
+function mapaS(lang, piv) {
+  const L = codigoS(lang, piv).func.split('\n');
+  const py = lang === 'py';
+  const sig = L.findIndex(l => l.includes(py ? 'def quicksort' : (lang === 'cs' ? 'void Quicksort(' : 'void quicksort(')));
+  const acha = (txt, n = 1) => { let c = 0; for (let k = sig; k < L.length; k++) if (L[k].includes(txt) && ++c === n) return k; throw new Error(lang + ': ' + txt); };
+  let fim = -1;
+  if (!py) { for (let k = sig + 1; k < L.length; k++) if (L[k] === '}') { fim = k; break; } }
+  const wi = acha(py ? 'while array[i] < pivo' : 'array[++i] < pivo'), wj = acha(py ? 'while pivo < array[j]' : 'pivo < array[--j]');
+  const limI = acha(py ? 'if i == dir' : 'if (i == dir)'), limJ = acha(py ? 'if j == esq' : 'if (j == esq)'), se = acha(py ? 'if i >= j' : 'if (i >= j)');
+  return {
+    sig: [sig],
+    esc: piv === 'primeiro' ? [] : [acha(py ? 'm = ' : 'int m = ')],
+    leva: piv === 'primeiro' ? [] : [acha('leva o pivô')],
+    pivo: [acha('pivo = array[esq]')],
+    ij: [acha(py ? 'i, j = esq, dir + 1' : 'int i = esq, j = dir + 1')],
+    w: [acha(py ? 'while True' : (lang === 'c' ? 'while (1)' : 'while (true)'))],
+    incI: [py ? acha('i += 1', 1) : wi], wi: [wi], incI2: [py ? acha('i += 1', 2) : wi],
+    limI: [limI], limIb: py ? [limI, limI + 1] : [limI],
+    decJ: [py ? acha('j -= 1', 1) : wj], wj: [wj], decJ2: [py ? acha('j -= 1', 2) : wj],
+    limJ: [limJ], limJb: py ? [limJ, limJ + 1] : [limJ],
+    se: [se], seb: py ? [se, se + 1] : [se],
+    troca: [acha(py ? 'array[i], array[j] =' : 'roca(array, i, j)')],
+    trocaP: [acha('posição final')],
+    ifE: [acha('esq < j - 1')],
+    callE: [acha('array, esq, j - 1)')],
+    ifD: [acha('j + 1 < dir')],
+    callD: [acha('array, j + 1, dir)')],
+    fim: fim >= 0 ? [fim] : []
+  };
+}
+
+/* mapa: identificador semântico -> linhas (0-based) em cada linguagem */
+function mapa(lang, piv = 'meio', part = 'hoare') {
+  if (part === 'lomuto') return mapaL(lang, piv);
+  if (part === 'sedgewick') return mapaS(lang, piv);
+  const L = codigo(lang, piv).func.split('\n');
+  const acha = (txt, n = 1) => { let c = 0; for (let k = 0; k < L.length; k++) if (L[k].includes(txt) && ++c === n) return k; throw new Error(lang + ': ' + txt); };
+  const py = lang === 'py';
+  const sig = acha(py ? 'def quicksort' : (lang === 'cs' ? 'void Quicksort(' : 'void quicksort('));
+  let fim = -1;
+  if (!py) { for (let k = sig + 1; k < L.length; k++) if (L[k] === '}') { fim = k; break; } }
+  const m = {
+    sig: [sig],
+    ij: [acha(py ? 'i, j = esq, dir' : 'int i = esq, j = dir')],
+    pivo: [acha(py ? 'pivo = ' : 'int pivo = ')],
+    w: [acha(py ? 'while i <= j' : 'while (i <= j)')],
+    wi: [acha('array[i] < pivo')],
+    inc: [acha(py ? 'i += 1' : 'i++', 1)],
+    wj: [acha('array[j] > pivo')],
+    dec: [acha(py ? 'j -= 1' : 'j--', 1)],
+    se: [acha(py ? 'if i <= j' : 'if (i <= j)')],
+    troca: py ? [acha('array[i], array[j] =')] : [acha('int temp'), acha('array[i] = array[j]'), acha('array[j] = temp')],
+    inc2: [acha(py ? 'i += 1' : 'i++', 2)],
+    dec2: [acha(py ? 'j -= 1' : 'j--', 2)],
+    ifE: [acha(py ? 'if esq < j' : 'if (esq < j)')],
+    callE: [acha('array, esq, j)')],
+    ifD: [acha(py ? 'if i < dir' : 'if (i < dir)')],
+    callD: [acha('array, i, dir)')],
+    fim: fim >= 0 ? [fim] : []
+  };
+  return m;
+}
+
+/* simulação: gera a lista de passos */
+function simula(valores, piv = 'meio', semente = 12345, part = 'hoare') {
+  let rs = semente >>> 0 || 1;
+  const rnd = n => { rs = (Math.imul(rs, 1103515245) + 12345) >>> 0; return (rs >>> 8) % n; };
+  const el = valores.map((v, k) => ({ id: k, v }));      // elementos com identidade (para animar as trocas)
+  const a = el.slice();                                   // vetor de elementos
+  const passos = [];
+  const pilha = [];
+  const chamadas = [];                                    // árvore de recursão
+  const concl = [];                                       // intervalos já ordenados
+  const fixos = [];                                       // posições onde o pivô já chegou à posição final (Lomuto)
+  let comp = 0, trocas = 0, nch = 0;
+  const v = k => a[k].v;
+  const faixasL = t => {
+    if (!t || part === 'hoare') return null;
+    if (part === 'sedgewick') {
+      if (t.pronto) return [[t.esq, t.j - 1, '≤ pivô'], [t.j + 1, t.dir, '≥ pivô']];
+      if (t.i != null && t.j != null) return [[t.esq + 1, Math.min(t.i - 1, t.dir), '≤ pivô'], [Math.max(t.j + 1, t.esq + 1), t.dir, '≥ pivô']];
+      return null;
+    }
+    if (t.p != null) return [[t.esq, t.p - 1, '≤ pivô'], [t.p + 1, t.dir, '> pivô']];
+    if (t.j != null && t.i != null) return [[t.esq, t.i, '≤ pivô'], [t.i + 1, t.j - 1, '> pivô']];
+    return null;
+  };
+  const P = (id, nota, extra = {}) => passos.push({
+    id, nota, ordem: a.map(e => e.id), pilha: pilha.map(f => ({ ...f })), chamadas: chamadas.map(c => ({ ...c })),
+    concl: concl.map(r => [...r]), fixos: fixos.slice(), faixas: faixasL(pilha.at(-1)), comp, trocas, nch, ...extra
+  });
+  P('inicio', 'Vetor original. A chamada inicial ordena o vetor inteiro, de <code>0</code> até <code>n - 1</code>.', { inicial: true });
+
+  const qs = (esq, dir, pai, lado) => {
+    nch++;
+    const nid = chamadas.length;
+    chamadas.push({ esq, dir, pai, lado, estado: 'ativa' });
+    for (const c of chamadas) if (c.estado === 'atual') c.estado = 'ativa';
+    chamadas[nid].estado = 'atual';
+    const f = { esq, dir, i: null, j: null, pivo: null, m: null, nid };
+    pilha.push(f);
+    P('sig', `Chamada <code>quicksort(array, ${esq}, ${dir})</code>: ordena o trecho de ${esq} a ${dir}.`);
+    f.i = esq; f.j = dir;
+    P('ij', `<code>i</code> começa em <code>esq</code> (${esq}) e <code>j</code> começa em <code>dir</code> (${dir}).`);
+    const meio = Math.floor((esq + dir) / 2);
+    let txtPiv, cand = null;
+    if (piv === 'meio') { f.m = meio; txtPiv = `O pivô é o elemento do meio: posição <code>(${esq} + ${dir}) / 2 = ${meio}</code>, valor <b>${v(meio)}</b>.`; }
+    else if (piv === 'primeiro') { f.m = esq; txtPiv = `O pivô é o primeiro elemento do trecho: <code>array[${esq}]</code>, valor <b>${v(esq)}</b>.`; }
+    else if (piv === 'ultimo') { f.m = dir; txtPiv = `O pivô é o último elemento do trecho: <code>array[${dir}]</code>, valor <b>${v(dir)}</b>.`; }
+    else if (piv === 'aleatorio') { f.m = esq + rnd(dir - esq + 1); txtPiv = `O pivô é sorteado no trecho de ${esq} a ${dir}: saiu a posição ${f.m}, valor <b>${v(f.m)}</b>.`; }
+    else {
+      cand = [esq, meio, dir];
+      const vs = cand.map(v), med = [...vs].sort((x, y) => x - y)[1];
+      f.m = cand[vs.indexOf(med)];
+      txtPiv = `Mediana de três: entre <code>array[${esq}] = ${vs[0]}</code>, <code>array[${meio}] = ${vs[1]}</code> e <code>array[${dir}] = ${vs[2]}</code>, o valor do meio é <b>${med}</b>.`;
+    }
+    f.pivo = v(f.m); const pid = a[f.m].id;
+    P('pivo', txtPiv + ' Menores que o pivô devem ir para a esquerda; maiores, para a direita.', { marcaPivo: f.m, candidatos: cand });
+    while (true) {
+      const c1 = f.i <= f.j;
+      P('w', `<code>i <= j</code>? <code>${f.i} <= ${f.j}</code>: <b>${c1}</b>${c1 ? '' : '. Os índices se cruzaram: a partição terminou.'}`);
+      if (!c1) break;
+      while (true) {
+        comp++;
+        const c2 = v(f.i) < f.pivo;
+        P('wi', `<code>array[i] < pivo</code>? <code>array[${f.i}] = ${v(f.i)}</code>, <code>${v(f.i)} < ${f.pivo}</code>: <b>${c2}</b>${c2 ? ': o elemento já está do lado certo, avança <code>i</code>' : ': <code>i</code> para aqui (achou um elemento que não é menor que o pivô)'}`, { cmp: [f.i] });
+        if (!c2) break;
+        f.i++;
+        P('inc', `<code>i</code> avança para ${f.i}.`);
+      }
+      while (true) {
+        comp++;
+        const c3 = v(f.j) > f.pivo;
+        P('wj', `<code>array[j] > pivo</code>? <code>array[${f.j}] = ${v(f.j)}</code>, <code>${v(f.j)} > ${f.pivo}</code>: <b>${c3}</b>${c3 ? ': o elemento já está do lado certo, recua <code>j</code>' : ': <code>j</code> para aqui (achou um elemento que não é maior que o pivô)'}`, { cmp: [f.j] });
+        if (!c3) break;
+        f.j--;
+        P('dec', `<code>j</code> recua para ${f.j}.`);
+      }
+      const c4 = f.i <= f.j;
+      P('se', `<code>i <= j</code>? <code>${f.i} <= ${f.j}</code>: <b>${c4}</b>${c4 ? (f.i === f.j ? ': troca o elemento com ele mesmo e avança os dois índices' : `: troca <code>array[${f.i}]</code> (${v(f.i)}) com <code>array[${f.j}]</code> (${v(f.j)})`) : ': não troca'}`, { cmp: c4 ? [f.i, f.j] : [] });
+      if (c4) {
+        const x = f.i, y = f.j;
+        [a[x], a[y]] = [a[y], a[x]]; trocas++;
+        P('troca', x === y ? `Troca <code>array[${x}]</code> com ele mesmo (nada muda).` : `Trocou: agora <code>array[${x}] = ${v(x)}</code> e <code>array[${y}] = ${v(y)}</code>.`, { troca: [x, y] });
+        f.i++;
+        P('inc2', `<code>i</code> avança para ${f.i}.`);
+        f.j--;
+        P('dec2', `<code>j</code> recua para ${f.j}.`);
+      }
+    }
+    const c5 = esq < f.j;
+    const qp = a.findIndex(e => e.id === pid);
+    const obsPiv = qp > f.j && qp < f.i
+      ? ` O elemento-pivô (${f.pivo}) ficou entre <code>j</code> e <code>i</code>, na posição ${qp}: essa já é a posição final dele.`
+      : ` O elemento-pivô (${f.pivo}) está na posição ${qp}, dentro da parte da ${qp <= f.j ? 'esquerda' : 'direita'}: na partição de Hoare o pivô é só um valor de referência e ainda pode mudar de lugar.`;
+    P('ifE', `Partição pronta: de ${esq} a ${f.j} só há elementos <= ${f.pivo}; de ${f.i} a ${dir}, só >= ${f.pivo}.${obsPiv} <code>esq < j</code>? <code>${esq} < ${f.j}</code>: <b>${c5}</b>${c5 ? ': ordena a parte da esquerda' : ': a parte da esquerda tem no máximo um elemento'}`, { particao: true, marcaPivo: qp });
+    if (c5) {
+      P('callE', `Chama <code>quicksort(array, ${esq}, ${f.j})</code>. Esta chamada fica esperando na pilha.`, { particao: true });
+      qs(esq, f.j, nid, 'E');
+      chamadas[nid].estado = 'atual';
+      P('callE', `Voltou de <code>quicksort(array, ${esq}, ${f.j})</code>: o trecho de ${esq} a ${f.j} está ordenado.`);
+    }
+    const c6 = f.i < dir;
+    P('ifD', `<code>i < dir</code>? <code>${f.i} < ${dir}</code>: <b>${c6}</b>${c6 ? ': ordena a parte da direita' : ': a parte da direita tem no máximo um elemento'}`, { particao: true });
+    if (c6) {
+      P('callD', `Chama <code>quicksort(array, ${f.i}, ${dir})</code>.`, { particao: true });
+      qs(f.i, dir, nid, 'D');
+      chamadas[nid].estado = 'atual';
+      P('callD', `Voltou de <code>quicksort(array, ${f.i}, ${dir})</code>: o trecho de ${f.i} a ${dir} está ordenado.`);
+    }
+    concl.push([esq, dir]);
+    chamadas[nid].estado = 'feita';
+    P('fim', `Fim de <code>quicksort(array, ${esq}, ${dir})</code>: o trecho de ${esq} a ${dir} está ordenado. A chamada sai da pilha.`);
+    pilha.pop();
+    if (pai != null) chamadas[pai].estado = 'atual';
+  };
+  const qsL = (esq, dir, pai, lado) => {
+    nch++;
+    const nid = chamadas.length;
+    chamadas.push({ esq, dir, pai, lado, estado: 'ativa' });
+    for (const c of chamadas) if (c.estado === 'atual') c.estado = 'ativa';
+    chamadas[nid].estado = 'atual';
+    const f = { esq, dir, m: null, pivo: null, i: null, j: null, p: null, nid, pm: null };
+    pilha.push(f);
+    P('sig', `Chamada <code>quicksort(array, ${esq}, ${dir})</code>: ordena o trecho de ${esq} a ${dir}.`);
+    const meio = Math.floor((esq + dir) / 2);
+    let cand = null, txt;
+    if (piv !== 'ultimo') {
+      if (piv === 'meio') { f.m = meio; txt = `O pivô será o elemento do meio: <code>m = (${esq} + ${dir}) / 2 = ${meio}</code>, valor <b>${v(meio)}</b>.`; }
+      else if (piv === 'primeiro') { f.m = esq; txt = `O pivô será o primeiro elemento do trecho: <code>m = ${esq}</code>, valor <b>${v(esq)}</b>.`; }
+      else if (piv === 'aleatorio') { f.m = esq + rnd(dir - esq + 1); txt = `O pivô é sorteado no trecho de ${esq} a ${dir}: saiu <code>m = ${f.m}</code>, valor <b>${v(f.m)}</b>.`; }
+      else {
+        cand = [esq, meio, dir];
+        const [x, y, z] = cand.map(v);
+        f.m = ((x <= y && y <= z) || (z <= y && y <= x)) ? meio : ((y <= x && x <= z) || (z <= x && x <= y)) ? esq : dir;
+        txt = `Mediana de três: entre <code>array[${esq}] = ${x}</code>, <code>array[${meio}] = ${y}</code> e <code>array[${dir}] = ${z}</code>, o valor do meio é <b>${v(f.m)}</b>, na posição <code>m = ${f.m}</code>.`;
+      }
+      P('esc', txt, { marcaPivo: f.m, candidatos: cand });
+      [a[f.m], a[dir]] = [a[dir], a[f.m]]; trocas++;
+      f.pm = dir;
+      P('leva', f.m === dir ? `O pivô já está no fim do trecho (<code>m = dir = ${dir}</code>): a troca não muda nada.` : `Troca <code>array[${f.m}]</code> com <code>array[${dir}]</code>: o pivô (${v(dir)}) fica guardado no fim do trecho durante a partição.`, { troca: [f.m, dir] });
+    }
+    f.pivo = v(dir); f.pm = dir;
+    P('pivo', `<code>pivo = array[${dir}] = ${f.pivo}</code>. ${piv === 'ultimo' ? 'O pivô é o último elemento do trecho. ' : ''}A partição de Lomuto deixa o pivô no fim e varre o trecho com <code>j</code>; <code>i</code> marca o fim da região dos elementos <= pivô.`);
+    f.i = esq - 1;
+    P('iIni', `<code>i = esq - 1 = ${f.i}</code>: a região dos elementos <= pivô ainda está vazia.`);
+    for (f.j = esq; ; f.j++) {
+      const c = f.j < dir;
+      P('for', `${f.j === esq ? `<code>j</code> começa em <code>esq</code> (${esq})` : `<code>j</code> avança para ${f.j}`}. <code>j < dir</code>? <code>${f.j} < ${dir}</code>: <b>${c}</b>${c ? '' : ': a varredura terminou.'}`);
+      if (!c) break;
+      comp++;
+      const c2 = v(f.j) <= f.pivo;
+      P('se', `<code>array[j] <= pivo</code>? <code>array[${f.j}] = ${v(f.j)}</code>, <code>${v(f.j)} <= ${f.pivo}</code>: <b>${c2}</b>${c2 ? ': o elemento vai para a região da esquerda' : ': o elemento fica na região dos maiores'}`, { cmp: [f.j] });
+      if (c2) {
+        f.i++;
+        P('inc', `<code>i</code> avança para ${f.i}: a região dos elementos <= pivô cresce uma posição.`);
+        const x = f.i, y = f.j;
+        [a[x], a[y]] = [a[y], a[x]]; trocas++;
+        P('troca', x === y ? `Troca <code>array[${x}]</code> com ele mesmo (nada muda).` : `Trocou: agora <code>array[${x}] = ${v(x)}</code> e <code>array[${y}] = ${v(y)}</code>.`, { troca: [x, y] });
+      }
+    }
+    f.j = null;
+    f.p = f.i + 1;
+    P('pLinha', `<code>p = i + 1 = ${f.p}</code>: esta é a posição final do pivô. À esquerda dela ficam os ${f.p - esq} elemento${f.p - esq === 1 ? '' : 's'} <= pivô.`, { marcaPivo: f.p });
+    { const x = f.p; [a[x], a[dir]] = [a[dir], a[x]]; trocas++; }
+    fixos.push(f.p); f.pm = f.p;
+    P('trocaP', `${f.p === dir ? 'O pivô já está na posição ' + dir + ' (troca consigo mesmo).' : `Troca <code>array[${f.p}]</code> com <code>array[${dir}]</code>.`} O pivô <b>${f.pivo}</b> está na <b>posição final</b> ${f.p}: nenhuma chamada vai movê-lo de novo.`, { troca: [f.p, dir], particao: true });
+    const c5 = esq < f.p - 1;
+    P('ifE', `<code>esq < p - 1</code>? <code>${esq} < ${f.p - 1}</code>: <b>${c5}</b>${c5 ? ': ordena a parte da esquerda (sem o pivô)' : ': a parte da esquerda tem no máximo um elemento'}`, { particao: true });
+    if (c5) {
+      P('callE', `Chama <code>quicksort(array, ${esq}, ${f.p - 1})</code>. Esta chamada fica esperando na pilha.`, { particao: true });
+      qsL(esq, f.p - 1, nid, 'E');
+      chamadas[nid].estado = 'atual';
+      P('callE', `Voltou de <code>quicksort(array, ${esq}, ${f.p - 1})</code>: o trecho de ${esq} a ${f.p - 1} está ordenado.`);
+    }
+    const c6 = f.p + 1 < dir;
+    P('ifD', `<code>p + 1 < dir</code>? <code>${f.p + 1} < ${dir}</code>: <b>${c6}</b>${c6 ? ': ordena a parte da direita (sem o pivô)' : ': a parte da direita tem no máximo um elemento'}`, { particao: true });
+    if (c6) {
+      P('callD', `Chama <code>quicksort(array, ${f.p + 1}, ${dir})</code>.`, { particao: true });
+      qsL(f.p + 1, dir, nid, 'D');
+      chamadas[nid].estado = 'atual';
+      P('callD', `Voltou de <code>quicksort(array, ${f.p + 1}, ${dir})</code>: o trecho de ${f.p + 1} a ${dir} está ordenado.`);
+    }
+    concl.push([esq, dir]);
+    chamadas[nid].estado = 'feita';
+    P('fim', `Fim de <code>quicksort(array, ${esq}, ${dir})</code>: o trecho de ${esq} a ${dir} está ordenado. A chamada sai da pilha.`);
+    pilha.pop();
+    if (pai != null) chamadas[pai].estado = 'atual';
+  };
+  const qsS = (esq, dir, pai, lado) => {
+    nch++;
+    const nid = chamadas.length;
+    chamadas.push({ esq, dir, pai, lado, estado: 'ativa' });
+    for (const c of chamadas) if (c.estado === 'atual') c.estado = 'ativa';
+    chamadas[nid].estado = 'atual';
+    const f = { esq, dir, m: null, pivo: null, i: null, j: null, nid, pm: null, pronto: false };
+    pilha.push(f);
+    P('sig', `Chamada <code>quicksort(array, ${esq}, ${dir})</code>: ordena o trecho de ${esq} a ${dir}.`);
+    const meio = Math.floor((esq + dir) / 2);
+    let cand = null, txt;
+    if (piv !== 'primeiro') {
+      if (piv === 'meio') { f.m = meio; txt = `O pivô será o elemento do meio: <code>m = (${esq} + ${dir}) / 2 = ${meio}</code>, valor <b>${v(meio)}</b>.`; }
+      else if (piv === 'ultimo') { f.m = dir; txt = `O pivô será o último elemento do trecho: <code>m = ${dir}</code>, valor <b>${v(dir)}</b>.`; }
+      else if (piv === 'aleatorio') { f.m = esq + rnd(dir - esq + 1); txt = `O pivô é sorteado no trecho de ${esq} a ${dir}: saiu <code>m = ${f.m}</code>, valor <b>${v(f.m)}</b>.`; }
+      else {
+        cand = [esq, meio, dir];
+        const [x, y, z] = cand.map(v);
+        f.m = ((x <= y && y <= z) || (z <= y && y <= x)) ? meio : ((y <= x && x <= z) || (z <= x && x <= y)) ? esq : dir;
+        txt = `Mediana de três: entre <code>array[${esq}] = ${x}</code>, <code>array[${meio}] = ${y}</code> e <code>array[${dir}] = ${z}</code>, o valor do meio é <b>${v(f.m)}</b>, na posição <code>m = ${f.m}</code>.`;
+      }
+      P('esc', txt, { marcaPivo: f.m, candidatos: cand });
+      [a[f.m], a[esq]] = [a[esq], a[f.m]]; trocas++;
+      f.pm = esq;
+      P('leva', f.m === esq ? `O pivô já está no início do trecho (<code>m = esq = ${esq}</code>): a troca não muda nada.` : `Troca <code>array[${f.m}]</code> com <code>array[${esq}]</code>: o pivô (${v(esq)}) fica guardado no início do trecho e não participa da varredura.`, { troca: [f.m, esq] });
+    }
+    f.pivo = v(esq); f.pm = esq;
+    P('pivo', `<code>pivo = array[${esq}] = ${f.pivo}</code>. ${piv === 'primeiro' ? 'O pivô é o primeiro elemento do trecho. ' : ''}Na partição de Sedgewick o pivô fica separado em <code>array[esq]</code>; <code>i</code> e <code>j</code> varrem o resto do trecho, vindo das pontas.`);
+    f.i = esq; f.j = dir + 1;
+    P('ij', `<code>i = esq = ${esq}</code> e <code>j = dir + 1 = ${dir + 1}</code>: cada índice começa uma posição antes do primeiro elemento que vai examinar.`);
+    while (true) {
+      P('w', `Início de uma rodada da varredura.`);
+      f.i++;
+      P('incI', `<code>i</code> avança para ${f.i} (o incremento vem antes da comparação).`);
+      while (true) {
+        comp++;
+        const c = v(f.i) < f.pivo;
+        P('wi', `<code>array[i] < pivo</code>? <code>array[${f.i}] = ${v(f.i)}</code>, <code>${v(f.i)} < ${f.pivo}</code>: <b>${c}</b>${c ? ': o elemento já está do lado certo' : ': <code>i</code> para aqui (achou um elemento que não é menor que o pivô)'}`, { cmp: [f.i] });
+        if (!c) break;
+        const lim = f.i === dir;
+        P(lim ? 'limIb' : 'limI', `<code>i == dir</code>? <code>${f.i} == ${dir}</code>: <b>${lim}</b>${lim ? ': <code>i</code> chegou ao fim do trecho e para' : ''}`);
+        if (lim) break;
+        f.i++;
+        P('incI2', `<code>i</code> avança para ${f.i}.`);
+      }
+      f.j--;
+      P('decJ', `<code>j</code> recua para ${f.j} (o decremento vem antes da comparação).`);
+      while (true) {
+        comp++;
+        const c = f.pivo < v(f.j);
+        P('wj', `<code>pivo < array[j]</code>? <code>${f.pivo} < array[${f.j}] = ${v(f.j)}</code>: <b>${c}</b>${c ? ': o elemento já está do lado certo' : ': <code>j</code> para aqui (achou um elemento que não é maior que o pivô)'}`, { cmp: [f.j] });
+        if (!c) break;
+        const lim = f.j === esq;
+        P(lim ? 'limJb' : 'limJ', `<code>j == esq</code>? <code>${f.j} == ${esq}</code>: <b>${lim}</b>${lim ? ': <code>j</code> chegou ao início do trecho e para' : ''}`);
+        if (lim) break;
+        f.j--;
+        P('decJ2', `<code>j</code> recua para ${f.j}.`);
+      }
+      const cruz = f.i >= f.j;
+      P(cruz ? 'seb' : 'se', `<code>i >= j</code>? <code>${f.i} >= ${f.j}</code>: <b>${cruz}</b>${cruz ? ': os índices se encontraram ou se cruzaram, a varredura terminou' : `: troca <code>array[${f.i}]</code> (${v(f.i)}) com <code>array[${f.j}]</code> (${v(f.j)})`}`, { cmp: cruz ? [] : [f.i, f.j] });
+      if (cruz) break;
+      const x = f.i, y = f.j;
+      [a[x], a[y]] = [a[y], a[x]]; trocas++;
+      P('troca', `Trocou: agora <code>array[${x}] = ${v(x)}</code> e <code>array[${y}] = ${v(y)}</code>.`, { troca: [x, y] });
+    }
+    { const x = f.j; [a[esq], a[x]] = [a[x], a[esq]]; trocas++; }
+    fixos.push(f.j); f.pm = f.j; f.pronto = true;
+    P('trocaP', `${f.j === esq ? 'O pivô já está na posição ' + esq + ' (troca consigo mesmo).' : `Troca <code>array[${esq}]</code> com <code>array[${f.j}]</code>.`} O pivô <b>${f.pivo}</b> está na <b>posição final</b> ${f.j}: à esquerda só há elementos <= ${f.pivo} e à direita só >= ${f.pivo}. Nenhuma chamada vai movê-lo de novo.`, { troca: [esq, f.j] });
+    const pj = f.j;
+    const c5 = esq < pj - 1;
+    P('ifE', `<code>esq < j - 1</code>? <code>${esq} < ${pj - 1}</code>: <b>${c5}</b>${c5 ? ': ordena a parte da esquerda (sem o pivô)' : ': a parte da esquerda tem no máximo um elemento'}`);
+    if (c5) {
+      P('callE', `Chama <code>quicksort(array, ${esq}, ${pj - 1})</code>. Esta chamada fica esperando na pilha.`);
+      qsS(esq, pj - 1, nid, 'E');
+      chamadas[nid].estado = 'atual';
+      P('callE', `Voltou de <code>quicksort(array, ${esq}, ${pj - 1})</code>: o trecho de ${esq} a ${pj - 1} está ordenado.`);
+    }
+    const c6 = pj + 1 < dir;
+    P('ifD', `<code>j + 1 < dir</code>? <code>${pj + 1} < ${dir}</code>: <b>${c6}</b>${c6 ? ': ordena a parte da direita (sem o pivô)' : ': a parte da direita tem no máximo um elemento'}`);
+    if (c6) {
+      P('callD', `Chama <code>quicksort(array, ${pj + 1}, ${dir})</code>.`);
+      qsS(pj + 1, dir, nid, 'D');
+      chamadas[nid].estado = 'atual';
+      P('callD', `Voltou de <code>quicksort(array, ${pj + 1}, ${dir})</code>: o trecho de ${pj + 1} a ${dir} está ordenado.`);
+    }
+    concl.push([esq, dir]);
+    chamadas[nid].estado = 'feita';
+    P('fim', `Fim de <code>quicksort(array, ${esq}, ${dir})</code>: o trecho de ${esq} a ${dir} está ordenado. A chamada sai da pilha.`);
+    pilha.pop();
+    if (pai != null) chamadas[pai].estado = 'atual';
+  };
+  const raiz = part === 'lomuto' ? qsL : part === 'sedgewick' ? qsS : qs;
+  if (a.length > 1) raiz(0, a.length - 1, null, null);
+  else { concl.push([0, a.length - 1]); }
+  P('final', `Vetor ordenado: ${comp} comparações com o pivô, ${trocas} trocas e ${nch} chamada${nch === 1 ? '' : 's'} de <code>quicksort</code>.`, { final: true });
+  return { passos, elementos: el };
+}
+
+if (typeof module !== 'undefined') module.exports = { CODIGO, PIVOS, codigo, mapa, simula };
+
+{
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+const KW = /\b(void|int|static|def|while|if|return|for|in|len|sizeof)\b/g;
+const colore = l => esc(l).replace(KW, '<span class="kw">$1</span>').replace(/\b(\d+)\b/g, '<span class="nu">$1</span>');
+
+let lang = 'cs', piv = 'meio', part = 'hoare', sim = null, passos = [], k = 0, timer = null, mp = null, vetorAtual = [], origem = 'aleatoria';
+const guarda = (c, v) => { try { localStorage.setItem(c, v); } catch (e) { } };
+const le = c => { try { return localStorage.getItem(c); } catch (e) { return null; } };
+if (CODIGO[le('qsLang')]) lang = le('qsLang');
+if (PIVOS[le('qsPiv')]) $('piv').value = piv = le('qsPiv');
+if (['hoare', 'lomuto', 'sedgewick'].includes(le('qsPart'))) $('part').value = part = le('qsPart');
+if (['6', '8', '10', '12', '14', '16'].includes(le('qsTam'))) $('tam').value = le('qsTam');
+if (['aleatoria', 'crescente', 'decrescente'].includes(le('qsOrdem'))) $('ordem').value = le('qsOrdem');
+
+/* ---------------- código ---------------- */
+function montaCodigo() {
+  const C = codigo(lang, piv, part);
+  mp = mapa(lang, piv, part);
+  $('codCham').innerHTML = C.chamada.split('\n').map((l, n) => `<div><span class="n">${n + 1}</span>${colore(l)}</div>`).join('');
+  $('codFunc').innerHTML = C.func.split('\n').map((l, n) => `<div><span class="n">${n + 1}</span>${colore(l)}</div>`).join('');
+  $('arq1').textContent = C.arquivo; $('arq2').textContent = C.nome;
+  document.querySelectorAll('#langs button').forEach(b => b.setAttribute('aria-pressed', b.dataset.l === lang));
+}
+function marcaCodigo(p) {
+  const linhas = new Set(mp[p.id] || []);
+  const ds = $('codFunc').children;
+  for (let n = 0; n < ds.length; n++) ds[n].className = linhas.has(n) ? 'at' : '';
+  const cs = $('codCham').children, ult = cs.length - 1;
+  for (let n = 0; n < cs.length; n++) cs[n].className = n === ult ? (p.inicial || p.final ? 'at' : 'esp') : '';
+  const prim = [...linhas][0];
+  if (prim != null) { const d = ds[prim], box = $('codFunc'); if (d.offsetTop < box.scrollTop || d.offsetTop > box.scrollTop + box.clientHeight - 30) box.scrollTop = d.offsetTop - box.clientHeight / 2; }
+}
+
+/* ---------------- vetor ---------------- */
+let celulas = new Map(), geo = null;
+function montaVetor() {
+  const vet = $('vet'); vet.innerHTML = ''; celulas = new Map();
+  const n = sim.elementos.length;
+  const W = vet.clientWidth || 600;
+  const w = Math.min(64, W / (n + 2));
+  const x0 = (W - n * w) / 2;
+  const max = Math.max(...sim.elementos.map(e => e.v), 1);
+  geo = { w, x0, max, n };
+  for (let q = 0; q < n; q++) {
+    const d = document.createElement('div'); d.className = 'idx'; d.style.left = (x0 + q * w) + 'px'; d.style.width = w + 'px'; d.textContent = q; vet.appendChild(d);
+  }
+  for (const e of sim.elementos) {
+    const d = document.createElement('div'); d.className = 'cel'; d.style.width = w + 'px';
+    d.innerHTML = `<div class="bar" style="height:${Math.max(4, e.v / max * 150)}px"></div><div class="val">${e.v}</div>`;
+    vet.appendChild(d); celulas.set(e.id, d);
+  }
+  for (const nm of ['i', 'j', 'esq', 'dir']) {
+    const d = document.createElement('div'); d.className = 'ptr ' + nm; d.id = 'ptr-' + nm; d.style.width = w + 'px';
+    d.innerHTML = `▲<b>${nm}</b>`; vet.appendChild(d);
+  }
+  const pl = document.createElement('div'); pl.className = 'pivl'; pl.id = 'pivl'; pl.innerHTML = '<span></span>'; vet.appendChild(pl);
+  for (const s of ['e', 'd']) { const d = document.createElement('div'); d.className = 'part ' + s; d.id = 'part-' + s; vet.appendChild(d); }
+}
+function desenhaVetor(p) {
+  const { w, x0, max, n } = geo;
+  const f = p.pilha.at(-1);
+  const dentro = q => p.concl.some(([a, b]) => q >= a && q <= b);
+  p.ordem.forEach((id, q) => {
+    const d = celulas.get(id);
+    d.style.transform = `translateX(${x0 + q * w}px)`;
+    const cls = ['cel'];
+    if (p.final || dentro(q)) cls.push('concl');
+    else if (f && (q < f.esq || q > f.dir)) cls.push('fora');
+    if (p.cmp && p.cmp.includes(q)) cls.push('cmp');
+    if (p.troca && p.troca.includes(q)) cls.push('troca');
+    if (p.candidatos && p.candidatos.includes(q)) cls.push('cand');
+    if (p.marcaPivo === q || (f && f.pm === q)) cls.push('piv');
+    if (p.fixos && p.fixos.includes(q)) cls.push('fixo');
+    d.className = cls.join(' ');
+  });
+  const pos = (nm, q, dx, top) => { const d = $('ptr-' + nm); if (q == null || !f) { d.hidden = true; return; } d.hidden = false; d.style.top = top + 'px'; d.style.transform = `translateX(${x0 + q * w + dx}px)`; };
+  const igual = f && f.i === f.j;
+  pos('i', f && f.i, igual ? -w * 0.22 : 0, 222); pos('j', f && f.j, igual ? w * 0.22 : 0, 222);
+  const ed = f && f.esq === f.dir;
+  pos('esq', f && f.esq, ed ? -w * 0.28 : 0, 256); pos('dir', f && f.dir, ed ? w * 0.28 : 0, 256);
+  const pl = $('pivl');
+  if (f && f.pivo != null && !p.final) {
+    const h = Math.max(4, f.pivo / max * 150);
+    pl.hidden = false; pl.style.left = (x0 + f.esq * w) + 'px'; pl.style.width = ((f.dir - f.esq + 1) * w) + 'px'; pl.style.top = (200 - 34 - h) + 'px';
+    pl.firstChild.textContent = 'pivô = ' + f.pivo;
+  } else pl.hidden = true;
+  const pe = $('part-e'), pd = $('part-d');
+  const faixa0 = (el, a, b, txt) => { if (b < a) { el.hidden = true; return; } el.hidden = false; el.style.left = (x0 + a * w + 2) + 'px'; el.style.width = ((b - a + 1) * w - 4) + 'px'; el.style.top = '292px'; el.textContent = txt; };
+  if (p.faixas) { faixa0(pe, ...p.faixas[0]); faixa0(pd, ...p.faixas[1]); }
+  else if (p.particao && f) {
+    const faixa = (el, a, b, txt) => { if (b < a) { el.hidden = true; return; } el.hidden = false; el.style.left = (x0 + a * w + 2) + 'px'; el.style.width = ((b - a + 1) * w - 4) + 'px'; el.style.top = '292px'; el.textContent = txt; };
+    faixa(pe, f.esq, f.j, '≤ pivô'); faixa(pd, f.i, f.dir, '≥ pivô');
+  } else { pe.hidden = pd.hidden = true; }
+  $('trecho').textContent = f ? `trecho atual: ${f.esq} a ${f.dir}` : '';
+}
+
+/* ---------------- pilha e árvore de recursão ---------------- */
+function desenhaPilha(p) {
+  const nmf = lang === 'cs' ? 'Quicksort' : 'quicksort';
+  const cel = (n, v) => `<span class="c"><i>${n} </i>${v == null ? '–' : esc(v)}</span>`;
+  const campos = part === 'lomuto' ? ['esq', 'dir', ...(piv === 'ultimo' ? [] : ['m']), 'pivo', 'i', 'j', 'p']
+    : part === 'sedgewick' ? ['esq', 'dir', ...(piv === 'primeiro' ? [] : ['m']), 'pivo', 'i', 'j'] : ['esq', 'dir', 'i', 'j', 'pivo'];
+  $('pilha').innerHTML = p.pilha.length ? p.pilha.map((f, q) => `<div class="fr${q === p.pilha.length - 1 ? ' top' : ''}"><span class="nm">${nmf}(array, ${f.esq}, ${f.dir})</span>${campos.map(c => cel(c, f[c])).join('')}</div>`).join('')
+    : `<div class="dica" style="margin:4px 0">${p.final ? 'todas as chamadas terminaram' : 'nenhuma chamada em andamento'}</div>`;
+}
+function desenhaArvore(p) {
+  const svg = $('arvRec'), ch = p.chamadas;
+  if (!ch.length) { svg.setAttribute('viewBox', '0 0 300 40'); svg.style.width = ''; svg.innerHTML = `<text x="150" y="24" text-anchor="middle" font-size="13" fill="currentColor" opacity=".6">ainda sem chamadas</text>`; return; }
+  const filhos = ch.map(() => []);
+  ch.forEach((c, q) => { if (c.pai != null) filhos[c.pai].push(q); });
+  const NW = 58, NH = 26, GX = 64, GY = 46;
+  let folha = 0; const pos = [];
+  const lay = (q, d) => { const fs = filhos[q]; if (!fs.length) pos[q] = { x: folha++ * GX, y: d * GY }; else { fs.forEach(f => lay(f, d + 1)); pos[q] = { x: (pos[fs[0]].x + pos[fs.at(-1)].x) / 2, y: d * GY }; } };
+  lay(0, 0);
+  const W = Math.max(...pos.map(o => o.x)) + NW + 10, H = Math.max(...pos.map(o => o.y)) + NH + 10;
+  const css = getComputedStyle(document.documentElement), cor = v => css.getPropertyValue(v).trim();
+  let s = '';
+  ch.forEach((c, q) => { if (c.pai != null) s += `<line x1="${pos[c.pai].x + NW / 2 + 5}" y1="${pos[c.pai].y + NH + 5}" x2="${pos[q].x + NW / 2 + 5}" y2="${pos[q].y + 5}" stroke="${cor('--noborda')}" stroke-width="1.4"/>`; });
+  ch.forEach((c, q) => {
+    const st = { atual: [cor('--lar'), cor('--lar'), '#fff'], ativa: [cor('--larcl'), cor('--lar'), cor('--ink')], feita: [cor('--verdecl'), cor('--verde'), cor('--verde')] }[c.estado];
+    s += `<rect x="${pos[q].x + 5}" y="${pos[q].y + 5}" width="${NW}" height="${NH}" rx="6" fill="${st[0]}" stroke="${st[1]}" stroke-width="1.8"/><text x="${pos[q].x + 5 + NW / 2}" y="${pos[q].y + 5 + 17.5}" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="12.5" font-weight="700" fill="${st[2]}">${c.esq}–${c.dir}</text>`;
+  });
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  svg.style.width = Math.min(W * 1.15, svg.parentNode.clientWidth - 24) + 'px';
+  svg.style.margin = '0 auto';
+  svg.innerHTML = s;
+}
+
+/* ---------------- player ---------------- */
+const manual = () => $('modo').value === 'manual';
+function rotulo() { $('pPlay').textContent = manual() ? '▶ Executar passo' : timer ? '⏸ Pausar' : '▶ Executar'; $('pPlay').disabled = manual() && k >= passos.length - 1; $('vel').disabled = manual(); }
+function mostra() {
+  const p = passos[k];
+  marcaCodigo(p); desenhaVetor(p); desenhaPilha(p); desenhaArvore(p);
+  let nota = p.nota;
+  if (lang === 'py' && p.id === 'fim') nota += ' (Em Python, a função termina ao acabar o bloco indentado.)';
+  if (lang === 'cs') nota = nota.replace(/<code>quicksort\(/g, '<code>Quicksort(');
+  $('nota').innerHTML = nota; $('nota').className = 'nota' + (p.final ? ' fim' : '');
+  $('kComp').textContent = p.comp; $('kTro').textContent = p.trocas; $('kCha').textContent = p.nch;
+  $('barra').max = passos.length - 1; $('barra').value = k;
+  $('contador').textContent = `${k + 1}/${passos.length}`;
+  $('pIni').disabled = $('pAnt').disabled = k === 0;
+  $('pPro').disabled = $('pFim').disabled = k === passos.length - 1;
+  rotulo();
+}
+function para() { clearInterval(timer); timer = null; rotulo(); }
+function toca() { if (k >= passos.length - 1) k = 0; timer = setInterval(() => { if (k < passos.length - 1) { k++; mostra(); } else para(); }, +$('vel').value); rotulo(); }
+function ir(n) { para(); k = Math.max(0, Math.min(passos.length - 1, n)); mostra(); }
+
+/* ---------------- vetores ---------------- */
+function analise() {
+  const el = $('analise'), o = origem, n = vetorAtual.length;
+  const nomeP = { meio: 'o elemento do meio', primeiro: 'o primeiro elemento', ultimo: 'o último elemento', mediana: 'a mediana de três', aleatorio: 'um elemento sorteado' }[piv];
+  let t, pior = false;
+  if ((piv === 'primeiro' || piv === 'ultimo') && (o === 'crescente' || o === 'decrescente')) {
+    pior = true;
+    t = `<b>Pior caso.</b> Com o vetor já ${o === 'crescente' ? 'ordenado' : 'em ordem decrescente'}, ${nomeP} é sempre o menor ou o maior do trecho. Cada partição separa só um elemento, a árvore de recursão vira uma lista e o Quicksort faz Θ(n²) comparações. Compare os contadores com os do pivô do meio.`;
+  } else if (piv === 'meio' && (o === 'crescente' || o === 'decrescente')) {
+    t = `<b>Melhor caso.</b> Com o vetor ${o === 'crescente' ? 'ordenado' : 'em ordem decrescente'}, o elemento do meio é a mediana do trecho: as partições ficam equilibradas e a árvore de recursão tem altura próxima de lg n, com Θ(n lg n) comparações.`;
+  } else if (piv === 'mediana') {
+    t = `A <b>mediana de três</b> compara o primeiro, o do meio e o último elemento do trecho e usa o valor intermediário. Ela evita o pior caso nos vetores ordenados ou invertidos, com pouco custo extra.`;
+  } else if (piv === 'aleatorio') {
+    t = `Com o <b>pivô aleatório</b>, nenhum vetor de entrada provoca sempre o pior caso: o custo esperado é Θ(n lg n). Clique em Gerar vetor ou troque o pivô e volte para ver outros sorteios.`;
+  } else if (piv === 'primeiro' || piv === 'ultimo') {
+    t = `Com o vetor sem ordenação, ${nomeP} costuma funcionar bem: Θ(n lg n) comparações em média. Experimente a ordem inicial crescente para ver o pior caso.`;
+  } else {
+    t = `Vetor sem ordenação e pivô no meio: espera-se Θ(n lg n) comparações em média.`;
+  }
+  if (o === 'digitado') t = `Vetor digitado, pivô: <b>${PIVOS[piv].nome.toLowerCase()}</b>. ` + (piv === 'primeiro' || piv === 'ultimo' ? 'Se o vetor estiver ordenado, este pivô leva ao pior caso, Θ(n²).' : 'Acompanhe a árvore de recursão: quanto mais equilibrada, melhor.');
+  t += part === 'sedgewick'
+    ? '<br><b>Partição de Sedgewick:</b> combina as outras duas. Como em Hoare, <code>i</code> e <code>j</code> partem das pontas, param em elementos iguais ao pivô e só trocam pares do lado errado (poucas trocas). Como em Lomuto, o pivô fica separado, aqui em <code>array[esq]</code>, e no fim vai para a posição <code>j</code>, que é a <b>posição final</b> dele (marcada com ✓). Repare que <code>++i</code> e <code>--j</code> mudam o índice <b>antes</b> da comparação.'
+    : part === 'lomuto'
+    ? '<br><b>Partição de Lomuto:</b> <code>j</code> varre o trecho e <code>i</code> marca o fim da região dos elementos ≤ pivô. O pivô fica guardado no fim do trecho e, no final da partição, vai para a posição <code>p</code>, que é a <b>posição final</b> dele (marcada com ✓). As chamadas recursivas excluem o pivô. Costuma fazer mais trocas que a de Hoare.'
+    : '<br><b>Partição de Hoare:</b> <code>i</code> e <code>j</code> partem das pontas e só trocam pares que estão do lado errado, por isso costuma fazer menos trocas. O pivô é só um <b>valor de referência</b>: ao fim da partição, o elemento-pivô pode não estar na posição final. As chamadas recursivas incluem a posição dele.';
+  el.innerHTML = t; el.className = 'analise' + (pior ? ' pior' : '');
+}
+function carrega(vals, o) {
+  para();
+  vetorAtual = vals.slice(); if (o) origem = o;
+  $('vetor').value = vals.join(' ');
+  sim = simula(vals, piv, (Math.random() * 4294967296) >>> 0, part); passos = sim.passos; k = 0;
+  montaVetor(); mostra(); analise();
+}
+function usar() {
+  const v = $('vetor').value.trim().split(/[\s,;]+/).filter(Boolean).map(Number);
+  if (v.length < 2 || v.length > 16 || v.some(x => !Number.isInteger(x) || x < 0 || x > 99)) {
+    $('nota').innerHTML = 'Digite de <b>2 a 16</b> números inteiros entre <b>0 e 99</b>.'; $('nota').className = 'nota'; return;
+  }
+  carrega(v, 'digitado');
+}
+function distintos(n) { const s = new Set(); while (s.size < n) s.add(1 + Math.floor(Math.random() * 98)); return [...s]; }
+function gerar() {
+  const n = +$('tam').value, o = $('ordem').value;
+  let v = distintos(n);
+  if (o === 'crescente') v.sort((a, b) => a - b);
+  if (o === 'decrescente') v.sort((a, b) => b - a);
+  carrega(v, o);
+}
+$('bGerar').onclick = gerar;
+$('bUsar').onclick = usar;
+$('vetor').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); usar(); } });
+$('tam').onchange = () => { guarda('qsTam', $('tam').value); gerar(); };
+$('ordem').onchange = () => { guarda('qsOrdem', $('ordem').value); gerar(); };
+$('part').onchange = () => { part = $('part').value; guarda('qsPart', part); montaCodigo(); carrega(vetorAtual); };
+$('piv').onchange = () => { piv = $('piv').value; guarda('qsPiv', piv); montaCodigo(); carrega(vetorAtual); };
+document.querySelectorAll('#langs button').forEach(b => b.onclick = () => { lang = b.dataset.l; guarda('qsLang', lang); montaCodigo(); mostra(); });
+$('pPlay').onclick = () => { if (manual()) { if (k < passos.length - 1) { k++; mostra(); } } else timer ? para() : toca(); };
+$('pAnt').onclick = () => ir(k - 1); $('pPro').onclick = () => ir(k + 1);
+$('pIni').onclick = () => ir(0); $('pFim').onclick = () => ir(passos.length - 1);
+$('barra').oninput = e => ir(+e.target.value);
+$('vel').onchange = () => { if (timer) { para(); toca(); } };
+$('modo').onchange = () => { para(); try { localStorage.setItem('qsModo', $('modo').value); } catch (e) { } };
+try { const mm = localStorage.getItem('qsModo'); if (mm === 'manual' || mm === 'auto') $('modo').value = mm; } catch (e) { }
+document.addEventListener('keydown', e => {
+  const t = (e.target.tagName || '').toLowerCase();
+  if (t === 'input' || t === 'select') return;
+  if (e.key === 'ArrowRight') { e.preventDefault(); ir(k + 1); }
+  else if (e.key === 'ArrowLeft') { e.preventDefault(); ir(k - 1); }
+});
+new ResizeObserver(() => { if (sim) { const kk = k; montaVetor(); k = kk; mostra(); } }).observe($('vet'));
+const rede = () => sim && desenhaArvore(passos[k]);
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', rede);
+new MutationObserver(rede).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+
+montaCodigo();
+gerar();
+}
+
+</script>
+</body>
+</html>
