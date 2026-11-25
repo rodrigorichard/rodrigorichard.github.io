@@ -1193,7 +1193,7 @@ document.addEventListener('keydown', e => {
   if (e.key === 'ArrowRight') { e.preventDefault(); ir(k + 1); }
   else if (e.key === 'ArrowLeft') { e.preventDefault(); ir(k - 1); }
 });
-new ResizeObserver(() => { if (sim) { const kk = k; montaVetor(); k = kk; mostra(); } }).observe($('vet'));
+{ let lw = -1; new ResizeObserver(en => { const w = Math.round(en[0].contentRect.width); if (w === lw) return; lw = w; requestAnimationFrame(() => { if (sim) { const kk = k; montaVetor(); k = kk; mostra(); } }); }).observe($('vet')); }
 const rede = () => sim && desenhaArvore(passos[k]);
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change', rede);
 new MutationObserver(rede).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });

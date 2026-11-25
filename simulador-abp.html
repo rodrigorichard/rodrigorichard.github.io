@@ -906,7 +906,7 @@ document.addEventListener('keydown', e => {
   else if (e.key === 'ArrowLeft') { e.preventDefault(); $('pAnt').click(); }
   else if (e.key === ' ' && e.target.tagName !== 'BUTTON') { e.preventDefault(); $('pPlay').click(); }
 });
-new ResizeObserver(() => passos[k] && desenha(passos[k], 1)).observe($('svg'));
+{ let lw = -1; new ResizeObserver(en => { const w = Math.round(en[0].contentRect.width); if (w === lw) return; lw = w; requestAnimationFrame(() => { passos[k] && desenha(passos[k], 1); }); }).observe($('svg')); }
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => passos[k] && desenha(passos[k], 1));
 new MutationObserver(() => passos[k] && desenha(passos[k], 1)).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
 

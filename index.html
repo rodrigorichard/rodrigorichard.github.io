@@ -70,6 +70,13 @@ const SIMULADORES = [
     arquivo: 'simulador-quicksort.html',
     tags: ['ordenação', 'C · Java · C# · Python', 'recursão'],
     figura: 'quick'
+  },
+  {
+    titulo: 'Árvore AVL',
+    descricao: 'Inserção, remoção e pesquisa numa AVL, em C, C++, Java ou C#: a altura e o fator de balanceamento de cada nó, o Balancear conferindo cada nó na volta da recursão, as rotações simples e duplas acontecendo na tela, com o nome de cada rotação e o motivo de ela ser aplicada, a pilha de execução e quem recebe cada retorno. O fator pode ser calculado como altura(esq) − altura(dir) ou o contrário. Inclui casos prontos para cada tipo de rotação.',
+    arquivo: 'simulador-avl.html',
+    tags: ['árvores balanceadas', 'C · C++ · Java · C#', 'rotações'],
+    figura: 'avl'
   }
 ];
 
@@ -101,6 +108,21 @@ const FIGURAS = {
         <circle cx="${x+54}" cy="89" r="3" fill="var(--noborda)"/>
         ${k<2?`<line x1="${x+54}" y1="89" x2="${x+80}" y2="89" stroke="var(--noborda)" stroke-width="2" marker-end="url(#fm)"/>`:`<path d="M${x+54} 89v20m-8 0h16m-11 4h6" stroke="var(--noborda)" stroke-width="2" fill="none"/>`}`).join('')}
       <text x="34" y="128" text-anchor="middle" font-family="Source Sans 3,sans-serif" font-weight="700" font-size="11" fill="var(--lar)">cabeça</text>
+    </g>
+  </svg>`,
+  avl: `<svg viewBox="0 0 280 150" role="img" aria-label="Rotação simples à direita numa árvore AVL">
+    <defs><marker id="am" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0L10 5L0 10z" fill="var(--verde, #2e7d4f)"/></marker></defs>
+    <g stroke="var(--noborda)" stroke-width="2"><line x1="70" y1="30" x2="45" y2="75"/><line x1="45" y1="75" x2="22" y2="120"/>
+      <line x1="215" y1="48" x2="180" y2="100"/><line x1="215" y1="48" x2="250" y2="100"/></g>
+    <path d="M110 75Q140 55 165 75" fill="none" stroke="var(--verde, #2e7d4f)" stroke-width="2.6" marker-end="url(#am)"/>
+    <g font-family="Source Sans 3,sans-serif" font-weight="700" font-size="14" text-anchor="middle">
+      ${[[70,30,30,'d'],[45,75,20,'j'],[22,120,10],[215,48,20,'j'],[180,100,10],[250,100,30]].map(([x,y,v,e]) =>
+        `<circle cx="${x}" cy="${y}" r="17" fill="${e==='d'?'var(--vermcl, #fcedec)':e==='j'?'var(--roxocl, #eee6f7)':'var(--no)'}" stroke="${e==='d'?'var(--verm, #b3261e)':e==='j'?'var(--roxo, #6b3fa0)':'var(--noborda)'}" stroke-width="${e?3:2.2}"/>
+         <text x="${x}" y="${y+5}" fill="var(--ink)">${v}</text>`).join('')}
+    </g>
+    <g font-family="JetBrains Mono,monospace" font-size="11" font-weight="700">
+      <rect x="84" y="12" width="24" height="16" rx="8" fill="var(--verm, #b3261e)"/><text x="96" y="24" text-anchor="middle" fill="#fff">+2</text>
+      <text x="138" y="50" text-anchor="middle" fill="var(--verde, #2e7d4f)">rotação</text>
     </g>
   </svg>`,
   quick: `<svg viewBox="0 0 280 150" role="img" aria-label="Barras de um vetor sendo ordenado, com o pivô">

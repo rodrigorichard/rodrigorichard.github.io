@@ -1,0 +1,1668 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Simulador de Árvore AVL</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+/* VOICE: material de aula da PUC Minas — sóbrio, claro, feito para projetar e para o aluno mexer sozinho.
+   IDEA: o mesmo teste de mesa do simulador de ABP, agora com a altura e o fator de cada nó e as rotações acontecendo na tela.
+   PICTURE: a árvore girando: o nó que sobe, o que desce e a subárvore que troca de pai.
+   COLOUR and TYPE: azul-marinho e dourado do template das aulas; laranja só para o que está acontecendo agora.
+   LAYOUT: barra de operações, depois código à esquerda e árvore + memória à direita; abaixo, o player e a classe completa. */
+:root{color-scheme:light dark;
+ --bg:light-dark(#f6f7f9,#0e1522);--card:light-dark(#fff,#16202f);--ink:light-dark(#18202b,#e6ebf2);--mute:light-dark(#5b6573,#9aa6b6);
+ --navy:#0b2d5b;--navyink:light-dark(#0b2d5b,#a9c3e8);--gold:#c9a227;--line:light-dark(#d9dfe8,#2a3647);
+ --no:light-dark(#e8eef7,#1d2c44);--noborda:light-dark(#0b2d5b,#7fa3d6);
+ --lar:#d9822b;--larcl:light-dark(#fcebd9,#3a2a16);--verde:#2e7d4f;--verdecl:light-dark(#dff2e6,#173323);
+ --verm:#b3261e;--vermcl:light-dark(#fcedec,#3b1a18);--roxo:#6b3fa0;--roxocl:light-dark(#eee6f7,#2a1f3a);
+ --codebg:light-dark(#f3f5f8,#101826)}
+:root[data-theme=light]{color-scheme:light}:root[data-theme=dark]{color-scheme:dark}
+*{box-sizing:border-box;min-width:0}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 "Source Sans 3",system-ui,sans-serif;overflow-x:clip}
+header{background:var(--navy);color:#fff;border-bottom:4px solid var(--gold);padding:14px max(3vw,14px)}
+header h1{margin:0;font-size:clamp(22px,3vw,30px);line-height:1.1}
+header p{margin:4px 0 0;color:#c8d6ea;font-size:15px}
+main{padding:14px max(3vw,14px) 40px;max-width:1500px;margin:auto}
+.ops{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+.grp{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.grp+.grp{border-left:1px solid var(--line);padding-left:14px}
+label.lb{font-size:14px;color:var(--mute)}
+input[type=text]{font:16px "JetBrains Mono",monospace;width:9.5em;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink)}
+button,select{font:600 15px "Source Sans 3",sans-serif;min-height:40px;padding:6px 12px;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer}
+button:hover{border-color:var(--navyink)}
+button.pri{background:var(--navy);color:#fff;border-color:var(--navy)}
+button.pri:hover{background:#123f7d}
+button:focus-visible,select:focus-visible,input:focus-visible{outline:3px solid var(--gold);outline-offset:1px}
+button:disabled{opacity:.45;cursor:default}
+.palco{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,3fr);gap:14px;margin-top:14px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.tit{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--line);font-weight:700;color:var(--navyink);font-size:15px}
+.tit small{font-weight:400;color:var(--mute)}
+pre.cod{position:relative;margin:0;padding:8px 0;background:var(--codebg);font:13px/1.62 "JetBrains Mono",monospace;overflow:auto;max-height:560px}
+pre.cod div{padding:0 12px 0 10px;border-left:4px solid transparent;white-space:pre}
+pre.cod div.at{background:var(--larcl);border-left-color:var(--lar)}
+pre.cod div.at.err{background:var(--vermcl);border-left-color:var(--verm)}
+pre.cod .n{display:inline-block;width:2.2em;color:var(--mute);opacity:.6;user-select:none}
+.kw{color:light-dark(#0b2d5b,#8fb5ec);font-weight:600}.cm{color:var(--verde);font-style:italic}.st{color:light-dark(#9a5a12,#e0a45a)}
+.fig{position:relative;height:420px;background:var(--card)}
+.fig svg{position:absolute;inset:0;width:100%;height:100%}
+.nota{margin:10px 12px;padding:9px 12px;border-radius:8px;background:var(--larcl);border-left:4px solid var(--lar);min-height:44px}
+.nota.err{background:var(--vermcl);border-left-color:var(--verm)}
+.nota code,.tela code{font:13.5px "JetBrains Mono",monospace}
+.baixo{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:0;border-top:1px solid var(--line)}
+.mem{padding:8px 12px;font:13px "JetBrains Mono",monospace}
+.mem h3,.telab h3{margin:0 0 6px;font:700 13px "Source Sans 3",sans-serif;color:var(--mute)}
+.fr{display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:4px 6px;margin-top:4px;border:1px solid var(--line);border-radius:6px}
+.fr.top{border-color:var(--lar);background:var(--larcl)}
+.fr .nm{flex:1 1 8.5em;color:var(--mute)}
+.cel{border:1px solid var(--noborda);background:var(--card);padding:0 6px;border-radius:3px}
+.cel i{font-style:normal;color:var(--mute)}
+.telab{padding:4px 12px 12px}
+.tela{background:#111b27;color:#7ee2a0;font:15px "JetBrains Mono",monospace;padding:8px 10px;border-radius:6px;min-height:40px;overflow-wrap:anywhere}
+.res{margin-top:8px;font-size:15px}
+.player{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px;position:sticky;top:0;z-index:5;box-shadow:0 4px 14px rgba(11,45,91,.12);background:var(--card);border:1px solid var(--line);border-radius:10px;padding:8px 12px}
+.player input[type=range]{flex:1 1 200px;accent-color:var(--navy);min-height:40px}
+.cont{font:14px "JetBrains Mono",monospace;color:var(--mute);white-space:nowrap}
+.chk{display:flex;gap:6px;align-items:center;font-size:15px}
+.chk input{width:18px;height:18px;accent-color:var(--navy)}
+.log{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;font:13px "JetBrains Mono",monospace}
+.log span{padding:2px 8px;border-radius:12px;background:var(--no);color:var(--navyink)}
+.log span.e{background:var(--vermcl);color:var(--verm)}
+details{margin-top:16px;background:var(--card);border:1px solid var(--line);border-radius:10px}
+summary{cursor:pointer;padding:12px;font-weight:700;color:var(--navyink)}
+details pre{margin:0;max-height:none;border-top:1px solid var(--line)}
+.leg{display:flex;flex-wrap:wrap;gap:12px;font-size:14px;color:var(--mute);margin-top:10px}
+.leg b{display:inline-block;width:14px;height:14px;border-radius:50%;vertical-align:-2px;margin-right:4px;border:2px solid}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.seg button{border:0;border-radius:0;min-width:58px}
+.seg button+button{border-left:1px solid var(--line)}
+.seg button[aria-pressed=true]{background:var(--navy);color:#fff}
+.caso{max-width:100%}
+.rot{margin:10px 12px 0;padding:9px 12px;border-radius:8px;background:var(--roxocl);border-left:5px solid var(--roxo)}
+.rot h3{margin:0;font-size:17px;color:var(--roxo);display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center}
+.rot .et{font:600 13px "Source Sans 3",sans-serif;background:var(--roxo);color:#fff;border-radius:12px;padding:1px 10px}
+.rot p{margin:4px 0 0;font-size:15px}
+.rot code{font:13.5px "JetBrains Mono",monospace}
+.tela{display:none}
+.res{margin:0 12px 10px;font-size:15px}
+@media(max-width:900px){.palco{grid-template-columns:minmax(0,1fr)}.cardcod{order:2}pre.cod{max-height:340px}}
+@media(max-width:600px){.grp+.grp{border-left:0;padding-left:0}pre.cod{font-size:12.5px}}
+@media(max-width:600px){.player{position:static}}
+@media(prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<header>
+  <h1>Simulador de Árvore AVL</h1>
+  <p>Algoritmos e Estruturas de Dados · PUC Minas · inserção, remoção e rotações, linha a linha, em C, C++, Java ou C# · <a href="index.html" style="color:#fff">todos os simuladores</a></p>
+</header>
+<main>
+  <div class="ops" role="group" aria-label="Operações">
+    <div class="grp">
+      <span class="lb">Linguagem</span>
+      <div class="seg" id="langs" role="group" aria-label="Linguagem do código">
+        <button data-l="c" aria-pressed="false">C</button><button data-l="cpp" aria-pressed="false">C++</button><button data-l="java" aria-pressed="false">Java</button><button data-l="cs" aria-pressed="true">C#</button>
+      </div>
+    </div>
+    <div class="grp">
+      <label class="lb" for="conv">Fator de balanceamento</label>
+      <select id="conv"><option value="ed" selected>altura(esq) − altura(dir)</option><option value="de">altura(dir) − altura(esq)</option></select>
+    </div>
+    <div class="grp">
+      <label class="lb" for="val">Valor(es)</label>
+      <input type="text" id="val" value="5" inputmode="numeric" autocomplete="off" aria-describedby="dicaval">
+      <button class="pri" id="bIns">Inserir</button>
+      <button class="pri" id="bRem">Remover</button>
+      <button class="pri" id="bPes">Pesquisar</button>
+    </div>
+    <div class="grp">
+      <label class="lb" for="caso">Casos</label>
+      <select id="caso" class="caso">
+        <option value="">escolha um caso…</option>
+        <option value="LL">Rotação simples à direita (inserir 10)</option>
+        <option value="RR">Rotação simples à esquerda (inserir 90)</option>
+        <option value="LR">Rotação dupla à direita (inserir 45)</option>
+        <option value="RL">Rotação dupla à esquerda (inserir 55)</option>
+        <option value="REM">Remoção que desbalanceia (remover 80)</option>
+        <option value="REM2">Remoção de nó com dois filhos (remover 50)</option>
+        <option value="SEQ">Inserção em ordem crescente (inserir 7)</option>
+      </select>
+    </div>
+    <div class="grp">
+      <button id="bEx">Árvore de exemplo</button>
+      <button id="bAle">Aleatória</button>
+      <button id="bLim">Esvaziar</button>
+    </div>
+  </div>
+  <p id="dicaval" class="leg" style="margin:6px 2px 0;display:block">Digite um número inteiro. Vários números separados por espaço ou vírgula (ex.: 50 30 70) são inseridos de uma vez, sem passo a passo. <span id="dicafb"></span> A subárvore vazia tem altura −1.</p>
+
+  <div class="player" role="group" aria-label="Controle dos passos">
+    <button id="pIni" title="Primeiro passo" aria-label="Primeiro passo">⏮</button>
+    <button id="pAnt" title="Passo anterior (←)" aria-label="Passo anterior">◀</button>
+    <button id="pPlay" class="pri" title="Executar / pausar (espaço)" aria-label="Executar ou pausar" style="min-width:150px">▶ Executar</button>
+    <button id="pPro" title="Próximo passo (→)" aria-label="Próximo passo">▶|</button>
+    <button id="pFim" title="Último passo" aria-label="Último passo">⏭</button>
+    <input type="range" id="pBar" min="0" max="0" value="0" aria-label="Passo">
+    <span class="cont" id="pCont">0/0</span>
+    <select id="modo" aria-label="Modo de execução">
+      <option value="auto">Execução automática</option><option value="manual">Um passo por clique</option>
+    </select>
+    <select id="vel" aria-label="Velocidade">
+      <option value="1600">0,5×</option><option value="900" selected>1×</option><option value="450">2×</option><option value="200">4×</option>
+    </select>
+    <label class="chk"><input type="checkbox" id="passo" checked> passo a passo</label>
+    <label class="chk"><input type="checkbox" id="info" checked> altura e fator</label>
+    <label class="chk"><input type="checkbox" id="nulos"> mostrar null</label>
+  </div>
+
+  <div class="palco">
+    <section class="card cardcod" aria-label="Código em execução">
+      <div class="tit"><span id="codTit">Código</span><small id="codLang"></small></div>
+      <pre class="cod" id="cod"></pre>
+    </section>
+    <section class="card" aria-label="Árvore e memória">
+      <div class="tit"><span>Memória: pilha de execução e árvore</span><small id="info2"></small></div>
+      <div class="fig"><svg id="svg" role="img" aria-label="Pilha de execução e árvore na memória"></svg></div>
+      <div class="rot" id="rot" hidden aria-live="polite"></div>
+      <div class="nota" id="nota" aria-live="polite"></div>
+      <div class="res" id="res"></div>
+    </section>
+  </div>
+
+  <div class="leg">
+    <span><b style="background:var(--larcl);border-color:var(--lar)"></b>caminho percorrido</span>
+    <span><b style="background:var(--lar);border-color:var(--lar)"></b>nó novo</span>
+    <span><b style="background:var(--vermcl);border-color:var(--verm);border-width:3px"></b>desbalanceado (|fb| &gt; 1) ou a remover</span>
+    <span><b style="background:var(--roxocl);border-color:var(--roxo)"></b>nó que sobe na rotação (j) / antecessor</span>
+    <span><b style="background:var(--verdecl);border-color:var(--verde)"></b>já balanceado na volta</span>
+    <span><b style="background:var(--verdecl);border-color:var(--verde);border-radius:4px"></b>quem recebe o retorno</span>
+    <span>no nó: <code>h</code> = altura guardada, no canto o fator</span>
+    <span>nas mensagens, <code>n(5)</code> = referência para o nó que guarda 5</span>
+  </div>
+  <div class="log" id="log" aria-label="Histórico de operações"></div>
+
+  <details>
+    <summary id="fullTit">Código completo</summary>
+    <div style="padding:0 12px 10px;display:flex;gap:10px;align-items:center"><button id="bCopia">Copiar código</button><span id="copiado" class="leg" style="margin:0"></span></div>
+    <pre class="cod" id="full"></pre>
+  </details>
+</main>
+<footer style="padding:0 max(3vw,14px) 30px;color:var(--mute);font-size:14px;max-width:1500px;margin:auto">Algoritmos e Estruturas de Dados · PUC Minas · Prof. Rodrigo Richard Gomes · o código nas quatro linguagens foi compilado e testado</footer>
+<script>
+/* Se algo der errado, mostra a mensagem real na página (em vez de só "Script error") */
+window.addEventListener('error', ev => {
+  try {
+    const n = document.getElementById('nota');
+    const msg = (ev.error && ev.error.stack) || ev.message || 'erro desconhecido';
+    if (n) { n.className = 'nota err'; n.innerHTML = '<b>Erro no simulador.</b> Copie esta mensagem e envie ao professor:<br><code style="white-space:pre-wrap">' +
+      String(msg).replace(/[&<>]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[ch])) + ' (linha ' + (ev.lineno || '?') + ')</code>'; }
+  } catch (e) {}
+});
+
+/* Código da árvore AVL nas quatro linguagens.
+   Cada linha pode terminar com um marcador ⟨id⟩ (retirado na exibição) que liga
+   o passo do simulador à linha.  Os blocos exibidos são exatamente os blocos
+   que formam o arquivo completo compilado nos testes. */
+const SRC = {
+/* =============================== C# =============================== */
+cs: {
+no: `public class No
+{
+    public int Elemento { get; set; }
+    public No? Esq { get; set; }
+    public No? Dir { get; set; }
+    public int Altura { get; set; }     // uma folha tem altura 0
+
+    public No(int elemento)
+    {
+        Elemento = elemento;
+        Esq = null;
+        Dir = null;
+        Altura = 0;
+    }
+}`,
+alt: `// altura de uma subárvore (a subárvore vazia tem altura -1)
+private int Altura(No? i)
+{
+    return i == null ? -1 : i.Altura;
+}
+
+private void AtualizarAltura(No i)
+{
+    i.Altura = 1 + Math.Max(Altura(i.Esq), Altura(i.Dir));
+}
+
+// fator de balanceamento: positivo = mais alta à esquerda
+private int Fator(No i)
+{
+    return Altura(i.Esq) - Altura(i.Dir);
+}`,
+rd: `// rotação simples à direita: o filho esquerdo j sobe e i desce para a direita
+private No RotacionarDir(No i) ⟨rd.sig⟩
+{
+    No j = i.Esq!; ⟨rd.j⟩
+    i.Esq = j.Dir; ⟨rd.a⟩
+    j.Dir = i; ⟨rd.b⟩
+    AtualizarAltura(i); ⟨rd.hi⟩
+    AtualizarAltura(j); ⟨rd.hj⟩
+    return j; ⟨rd.ret⟩
+}`,
+re: `// rotação simples à esquerda: o filho direito j sobe e i desce para a esquerda
+private No RotacionarEsq(No i) ⟨re.sig⟩
+{
+    No j = i.Dir!; ⟨re.j⟩
+    i.Dir = j.Esq; ⟨re.a⟩
+    j.Esq = i; ⟨re.b⟩
+    AtualizarAltura(i); ⟨re.hi⟩
+    AtualizarAltura(j); ⟨re.hj⟩
+    return j; ⟨re.ret⟩
+}`,
+bal: `// atualiza a altura de i e, se i estiver desbalanceado, faz as rotações;
+// devolve a raiz (talvez nova) da subárvore
+private No Balancear(No i) ⟨bal.sig⟩
+{
+    AtualizarAltura(i); ⟨bal.h⟩
+    int fb = Fator(i); ⟨bal.fb⟩
+    if (fb > 1)                         // pende para a esquerda ⟨bal.if1⟩
+    {
+        if (Fator(i.Esq!) < 0)          // caso esquerda-direita ⟨bal.if1b⟩
+            i.Esq = RotacionarEsq(i.Esq!); ⟨bal.r1b⟩
+        return RotacionarDir(i); ⟨bal.r1⟩
+    }
+    if (fb < -1)                        // pende para a direita ⟨bal.if2⟩
+    {
+        if (Fator(i.Dir!) > 0)          // caso direita-esquerda ⟨bal.if2b⟩
+            i.Dir = RotacionarDir(i.Dir!); ⟨bal.r2b⟩
+        return RotacionarEsq(i); ⟨bal.r2⟩
+    }
+    return i; ⟨bal.ret⟩
+}`,
+insP: `public void Inserir(int x)
+{
+    _raiz = Inserir(x, _raiz); ⟨insP.call⟩
+} ⟨insP.fim⟩`,
+ins: `// insere x na subárvore i e devolve a raiz (talvez nova) dessa subárvore
+private No Inserir(int x, No? i) ⟨ins.sig⟩
+{
+    if (i == null) ⟨ins.null⟩
+        return new No(x); ⟨ins.new⟩
+    if (x < i.Elemento) ⟨ins.lt⟩
+        i.Esq = Inserir(x, i.Esq); ⟨ins.e⟩
+    else if (x > i.Elemento) ⟨ins.gt⟩
+        i.Dir = Inserir(x, i.Dir); ⟨ins.d⟩
+    else
+        throw new InvalidOperationException($"Elemento {x} já existe."); ⟨ins.err⟩
+    return Balancear(i); ⟨ins.bal⟩
+}`,
+remP: `public void Remover(int x)
+{
+    _raiz = Remover(x, _raiz); ⟨remP.call⟩
+} ⟨remP.fim⟩`,
+rem: `// remove x da subárvore i e devolve a raiz (talvez nova) dessa subárvore
+private No? Remover(int x, No? i) ⟨rem.sig⟩
+{
+    if (i == null) ⟨rem.null⟩
+        throw new InvalidOperationException($"Elemento {x} não encontrado."); ⟨rem.err⟩
+    if (x < i.Elemento) ⟨rem.lt⟩
+        i.Esq = Remover(x, i.Esq); ⟨rem.e⟩
+    else if (x > i.Elemento) ⟨rem.gt⟩
+        i.Dir = Remover(x, i.Dir); ⟨rem.d⟩
+    else if (i.Dir == null)             // casos 1 e 2: sem filho direito ⟨rem.c1⟩
+        return i.Esq; ⟨rem.r1⟩
+    else if (i.Esq == null)             // caso 2: só filho direito ⟨rem.c2⟩
+        return i.Dir; ⟨rem.r2⟩
+    else
+        i.Esq = MaiorEsq(i, i.Esq);     // caso 3: dois filhos ⟨rem.c3⟩
+    return Balancear(i); ⟨rem.bal⟩
+}`,
+me: `// copia para i o antecessor (o maior da subárvore j) e remove o nó dele
+private No? MaiorEsq(No i, No j) ⟨me.sig⟩
+{
+    if (j.Dir != null) ⟨me.if⟩
+    {
+        j.Dir = MaiorEsq(i, j.Dir); ⟨me.rec⟩
+        return Balancear(j); ⟨me.bal⟩
+    }
+    i.Elemento = j.Elemento; ⟨me.copia⟩
+    return j.Esq; ⟨me.ret⟩
+}`,
+pesP: `public bool Pesquisar(int x)
+{
+    return Pesquisar(x, _raiz); ⟨pesP.call⟩
+}`,
+pes: `private bool Pesquisar(int x, No? i) ⟨pes.sig⟩
+{
+    if (i == null) ⟨pes.null⟩
+        return false; ⟨pes.f⟩
+    if (x == i.Elemento) ⟨pes.eq⟩
+        return true; ⟨pes.t⟩
+    if (x < i.Elemento) ⟨pes.lt⟩
+        return Pesquisar(x, i.Esq); ⟨pes.e⟩
+    return Pesquisar(x, i.Dir); ⟨pes.d⟩
+}`
+},
+/* =============================== Java =============================== */
+java: {
+no: `class No {
+    int elemento;
+    No esq, dir;
+    int altura;          // uma folha tem altura 0
+
+    No(int elemento) {
+        this.elemento = elemento;
+        esq = null;
+        dir = null;
+        altura = 0;
+    }
+}`,
+alt: `// altura de uma subárvore (a subárvore vazia tem altura -1)
+private int altura(No i) {
+    return i == null ? -1 : i.altura;
+}
+
+private void atualizarAltura(No i) {
+    i.altura = 1 + Math.max(altura(i.esq), altura(i.dir));
+}
+
+// fator de balanceamento: positivo = mais alta à esquerda
+private int fator(No i) {
+    return altura(i.esq) - altura(i.dir);
+}`,
+rd: `// rotação simples à direita: o filho esquerdo j sobe e i desce para a direita
+private No rotacionarDir(No i) { ⟨rd.sig⟩
+    No j = i.esq; ⟨rd.j⟩
+    i.esq = j.dir; ⟨rd.a⟩
+    j.dir = i; ⟨rd.b⟩
+    atualizarAltura(i); ⟨rd.hi⟩
+    atualizarAltura(j); ⟨rd.hj⟩
+    return j; ⟨rd.ret⟩
+}`,
+re: `// rotação simples à esquerda: o filho direito j sobe e i desce para a esquerda
+private No rotacionarEsq(No i) { ⟨re.sig⟩
+    No j = i.dir; ⟨re.j⟩
+    i.dir = j.esq; ⟨re.a⟩
+    j.esq = i; ⟨re.b⟩
+    atualizarAltura(i); ⟨re.hi⟩
+    atualizarAltura(j); ⟨re.hj⟩
+    return j; ⟨re.ret⟩
+}`,
+bal: `// atualiza a altura de i e, se i estiver desbalanceado, faz as rotações;
+// devolve a raiz (talvez nova) da subárvore
+private No balancear(No i) { ⟨bal.sig⟩
+    atualizarAltura(i); ⟨bal.h⟩
+    int fb = fator(i); ⟨bal.fb⟩
+    if (fb > 1) {                       // pende para a esquerda ⟨bal.if1⟩
+        if (fator(i.esq) < 0)           // caso esquerda-direita ⟨bal.if1b⟩
+            i.esq = rotacionarEsq(i.esq); ⟨bal.r1b⟩
+        return rotacionarDir(i); ⟨bal.r1⟩
+    }
+    if (fb < -1) {                      // pende para a direita ⟨bal.if2⟩
+        if (fator(i.dir) > 0)           // caso direita-esquerda ⟨bal.if2b⟩
+            i.dir = rotacionarDir(i.dir); ⟨bal.r2b⟩
+        return rotacionarEsq(i); ⟨bal.r2⟩
+    }
+    return i; ⟨bal.ret⟩
+}`,
+insP: `public void inserir(int x) {
+    raiz = inserir(x, raiz); ⟨insP.call⟩
+} ⟨insP.fim⟩`,
+ins: `// insere x na subárvore i e devolve a raiz (talvez nova) dessa subárvore
+private No inserir(int x, No i) { ⟨ins.sig⟩
+    if (i == null) ⟨ins.null⟩
+        return new No(x); ⟨ins.new⟩
+    if (x < i.elemento) ⟨ins.lt⟩
+        i.esq = inserir(x, i.esq); ⟨ins.e⟩
+    else if (x > i.elemento) ⟨ins.gt⟩
+        i.dir = inserir(x, i.dir); ⟨ins.d⟩
+    else
+        throw new RuntimeException("Elemento " + x + " já existe."); ⟨ins.err⟩
+    return balancear(i); ⟨ins.bal⟩
+}`,
+remP: `public void remover(int x) {
+    raiz = remover(x, raiz); ⟨remP.call⟩
+} ⟨remP.fim⟩`,
+rem: `// remove x da subárvore i e devolve a raiz (talvez nova) dessa subárvore
+private No remover(int x, No i) { ⟨rem.sig⟩
+    if (i == null) ⟨rem.null⟩
+        throw new RuntimeException("Elemento " + x + " não encontrado."); ⟨rem.err⟩
+    if (x < i.elemento) ⟨rem.lt⟩
+        i.esq = remover(x, i.esq); ⟨rem.e⟩
+    else if (x > i.elemento) ⟨rem.gt⟩
+        i.dir = remover(x, i.dir); ⟨rem.d⟩
+    else if (i.dir == null)             // casos 1 e 2: sem filho direito ⟨rem.c1⟩
+        return i.esq; ⟨rem.r1⟩
+    else if (i.esq == null)             // caso 2: só filho direito ⟨rem.c2⟩
+        return i.dir; ⟨rem.r2⟩
+    else
+        i.esq = maiorEsq(i, i.esq);     // caso 3: dois filhos ⟨rem.c3⟩
+    return balancear(i); ⟨rem.bal⟩
+}`,
+me: `// copia para i o antecessor (o maior da subárvore j) e remove o nó dele
+private No maiorEsq(No i, No j) { ⟨me.sig⟩
+    if (j.dir != null) { ⟨me.if⟩
+        j.dir = maiorEsq(i, j.dir); ⟨me.rec⟩
+        return balancear(j); ⟨me.bal⟩
+    }
+    i.elemento = j.elemento; ⟨me.copia⟩
+    return j.esq; ⟨me.ret⟩
+}`,
+pesP: `public boolean pesquisar(int x) {
+    return pesquisar(x, raiz); ⟨pesP.call⟩
+}`,
+pes: `private boolean pesquisar(int x, No i) { ⟨pes.sig⟩
+    if (i == null) ⟨pes.null⟩
+        return false; ⟨pes.f⟩
+    if (x == i.elemento) ⟨pes.eq⟩
+        return true; ⟨pes.t⟩
+    if (x < i.elemento) ⟨pes.lt⟩
+        return pesquisar(x, i.esq); ⟨pes.e⟩
+    return pesquisar(x, i.dir); ⟨pes.d⟩
+}`
+},
+/* =============================== C++ =============================== */
+cpp: {
+no: `struct No {
+    int elemento;
+    No* esq;
+    No* dir;
+    int altura;          // uma folha tem altura 0
+
+    No(int x) : elemento(x), esq(nullptr), dir(nullptr), altura(0) {}
+};`,
+alt: `// altura de uma subárvore (a subárvore vazia tem altura -1)
+int altura(No* i) {
+    return i == nullptr ? -1 : i->altura;
+}
+
+void atualizarAltura(No* i) {
+    i->altura = 1 + std::max(altura(i->esq), altura(i->dir));
+}
+
+// fator de balanceamento: positivo = mais alta à esquerda
+int fator(No* i) {
+    return altura(i->esq) - altura(i->dir);
+}`,
+rd: `// rotação simples à direita: o filho esquerdo j sobe e i desce para a direita
+No* rotacionarDir(No* i) { ⟨rd.sig⟩
+    No* j = i->esq; ⟨rd.j⟩
+    i->esq = j->dir; ⟨rd.a⟩
+    j->dir = i; ⟨rd.b⟩
+    atualizarAltura(i); ⟨rd.hi⟩
+    atualizarAltura(j); ⟨rd.hj⟩
+    return j; ⟨rd.ret⟩
+}`,
+re: `// rotação simples à esquerda: o filho direito j sobe e i desce para a esquerda
+No* rotacionarEsq(No* i) { ⟨re.sig⟩
+    No* j = i->dir; ⟨re.j⟩
+    i->dir = j->esq; ⟨re.a⟩
+    j->esq = i; ⟨re.b⟩
+    atualizarAltura(i); ⟨re.hi⟩
+    atualizarAltura(j); ⟨re.hj⟩
+    return j; ⟨re.ret⟩
+}`,
+bal: `// atualiza a altura de i e, se i estiver desbalanceado, faz as rotações;
+// devolve a raiz (talvez nova) da subárvore
+No* balancear(No* i) { ⟨bal.sig⟩
+    atualizarAltura(i); ⟨bal.h⟩
+    int fb = fator(i); ⟨bal.fb⟩
+    if (fb > 1) {                       // pende para a esquerda ⟨bal.if1⟩
+        if (fator(i->esq) < 0)          // caso esquerda-direita ⟨bal.if1b⟩
+            i->esq = rotacionarEsq(i->esq); ⟨bal.r1b⟩
+        return rotacionarDir(i); ⟨bal.r1⟩
+    }
+    if (fb < -1) {                      // pende para a direita ⟨bal.if2⟩
+        if (fator(i->dir) > 0)          // caso direita-esquerda ⟨bal.if2b⟩
+            i->dir = rotacionarDir(i->dir); ⟨bal.r2b⟩
+        return rotacionarEsq(i); ⟨bal.r2⟩
+    }
+    return i; ⟨bal.ret⟩
+}`,
+insP: `void inserir(int x) {
+    raiz = inserir(x, raiz); ⟨insP.call⟩
+} ⟨insP.fim⟩`,
+ins: `// insere x na subárvore i e devolve a raiz (talvez nova) dessa subárvore
+No* inserir(int x, No* i) { ⟨ins.sig⟩
+    if (i == nullptr) ⟨ins.null⟩
+        return new No(x); ⟨ins.new⟩
+    if (x < i->elemento) ⟨ins.lt⟩
+        i->esq = inserir(x, i->esq); ⟨ins.e⟩
+    else if (x > i->elemento) ⟨ins.gt⟩
+        i->dir = inserir(x, i->dir); ⟨ins.d⟩
+    else
+        throw std::runtime_error("Elemento " + std::to_string(x) + " já existe."); ⟨ins.err⟩
+    return balancear(i); ⟨ins.bal⟩
+}`,
+remP: `void remover(int x) {
+    raiz = remover(x, raiz); ⟨remP.call⟩
+} ⟨remP.fim⟩`,
+rem: `// remove x da subárvore i e devolve a raiz (talvez nova) dessa subárvore
+No* remover(int x, No* i) { ⟨rem.sig⟩
+    if (i == nullptr) ⟨rem.null⟩
+        throw std::runtime_error("Elemento " + std::to_string(x) + " não encontrado."); ⟨rem.err⟩
+    if (x < i->elemento) ⟨rem.lt⟩
+        i->esq = remover(x, i->esq); ⟨rem.e⟩
+    else if (x > i->elemento) ⟨rem.gt⟩
+        i->dir = remover(x, i->dir); ⟨rem.d⟩
+    else if (i->dir == nullptr) {       // casos 1 e 2: sem filho direito ⟨rem.c1⟩
+        No* e = i->esq; ⟨rem.r1⟩
+        delete i; ⟨rem.r1del⟩
+        return e; ⟨rem.r1ret⟩
+    }
+    else if (i->esq == nullptr) {       // caso 2: só filho direito ⟨rem.c2⟩
+        No* d = i->dir; ⟨rem.r2⟩
+        delete i; ⟨rem.r2del⟩
+        return d; ⟨rem.r2ret⟩
+    }
+    else
+        i->esq = maiorEsq(i, i->esq);   // caso 3: dois filhos ⟨rem.c3⟩
+    return balancear(i); ⟨rem.bal⟩
+}`,
+me: `// copia para i o antecessor (o maior da subárvore j) e remove o nó dele
+No* maiorEsq(No* i, No* j) { ⟨me.sig⟩
+    if (j->dir != nullptr) { ⟨me.if⟩
+        j->dir = maiorEsq(i, j->dir); ⟨me.rec⟩
+        return balancear(j); ⟨me.bal⟩
+    }
+    i->elemento = j->elemento; ⟨me.copia⟩
+    No* e = j->esq; ⟨me.ret⟩
+    delete j; ⟨me.del⟩
+    return e; ⟨me.retE⟩
+}`,
+pesP: `bool pesquisar(int x) {
+    return pesquisar(x, raiz); ⟨pesP.call⟩
+}`,
+pes: `bool pesquisar(int x, No* i) { ⟨pes.sig⟩
+    if (i == nullptr) ⟨pes.null⟩
+        return false; ⟨pes.f⟩
+    if (x == i->elemento) ⟨pes.eq⟩
+        return true; ⟨pes.t⟩
+    if (x < i->elemento) ⟨pes.lt⟩
+        return pesquisar(x, i->esq); ⟨pes.e⟩
+    return pesquisar(x, i->dir); ⟨pes.d⟩
+}`
+},
+/* =============================== C =============================== */
+c: {
+no: `typedef struct No {
+    int elemento;
+    struct No* esq;
+    struct No* dir;
+    int altura;          // uma folha tem altura 0
+} No;
+
+typedef struct {
+    No* raiz;
+} ArvoreAVL;
+
+No* novoNo(int x) {
+    No* n = (No*) malloc(sizeof(No));
+    n->elemento = x;
+    n->esq = NULL;
+    n->dir = NULL;
+    n->altura = 0;
+    return n;
+}`,
+alt: `// altura de uma subárvore (a subárvore vazia tem altura -1)
+int altura(No* i) {
+    return i == NULL ? -1 : i->altura;
+}
+
+int maior(int a, int b) {
+    return a > b ? a : b;
+}
+
+void atualizarAltura(No* i) {
+    i->altura = 1 + maior(altura(i->esq), altura(i->dir));
+}
+
+// fator de balanceamento: positivo = mais alta à esquerda
+int fator(No* i) {
+    return altura(i->esq) - altura(i->dir);
+}`,
+rd: `// rotação simples à direita: o filho esquerdo j sobe e i desce para a direita
+No* rotacionarDir(No* i) { ⟨rd.sig⟩
+    No* j = i->esq; ⟨rd.j⟩
+    i->esq = j->dir; ⟨rd.a⟩
+    j->dir = i; ⟨rd.b⟩
+    atualizarAltura(i); ⟨rd.hi⟩
+    atualizarAltura(j); ⟨rd.hj⟩
+    return j; ⟨rd.ret⟩
+}`,
+re: `// rotação simples à esquerda: o filho direito j sobe e i desce para a esquerda
+No* rotacionarEsq(No* i) { ⟨re.sig⟩
+    No* j = i->dir; ⟨re.j⟩
+    i->dir = j->esq; ⟨re.a⟩
+    j->esq = i; ⟨re.b⟩
+    atualizarAltura(i); ⟨re.hi⟩
+    atualizarAltura(j); ⟨re.hj⟩
+    return j; ⟨re.ret⟩
+}`,
+bal: `// atualiza a altura de i e, se i estiver desbalanceado, faz as rotações;
+// devolve a raiz (talvez nova) da subárvore
+No* balancear(No* i) { ⟨bal.sig⟩
+    atualizarAltura(i); ⟨bal.h⟩
+    int fb = fator(i); ⟨bal.fb⟩
+    if (fb > 1) {                       // pende para a esquerda ⟨bal.if1⟩
+        if (fator(i->esq) < 0)          // caso esquerda-direita ⟨bal.if1b⟩
+            i->esq = rotacionarEsq(i->esq); ⟨bal.r1b⟩
+        return rotacionarDir(i); ⟨bal.r1⟩
+    }
+    if (fb < -1) {                      // pende para a direita ⟨bal.if2⟩
+        if (fator(i->dir) > 0)          // caso direita-esquerda ⟨bal.if2b⟩
+            i->dir = rotacionarDir(i->dir); ⟨bal.r2b⟩
+        return rotacionarEsq(i); ⟨bal.r2⟩
+    }
+    return i; ⟨bal.ret⟩
+}`,
+insP: `void arvoreInserir(ArvoreAVL* a, int x) {
+    a->raiz = inserir(x, a->raiz); ⟨insP.call⟩
+} ⟨insP.fim⟩`,
+ins: `// insere x na subárvore i e devolve a raiz (talvez nova) dessa subárvore
+No* inserir(int x, No* i) { ⟨ins.sig⟩
+    if (i == NULL) ⟨ins.null⟩
+        return novoNo(x); ⟨ins.new⟩
+    if (x < i->elemento) ⟨ins.lt⟩
+        i->esq = inserir(x, i->esq); ⟨ins.e⟩
+    else if (x > i->elemento) ⟨ins.gt⟩
+        i->dir = inserir(x, i->dir); ⟨ins.d⟩
+    else
+        return i;                       // x já existe: não insere ⟨ins.err⟩
+    return balancear(i); ⟨ins.bal⟩
+}`,
+remP: `void arvoreRemover(ArvoreAVL* a, int x) {
+    a->raiz = remover(x, a->raiz); ⟨remP.call⟩
+} ⟨remP.fim⟩`,
+rem: `// remove x da subárvore i e devolve a raiz (talvez nova) dessa subárvore
+No* remover(int x, No* i) { ⟨rem.sig⟩
+    if (i == NULL) ⟨rem.null⟩
+        return NULL;                    // x não está na árvore ⟨rem.err⟩
+    if (x < i->elemento) ⟨rem.lt⟩
+        i->esq = remover(x, i->esq); ⟨rem.e⟩
+    else if (x > i->elemento) ⟨rem.gt⟩
+        i->dir = remover(x, i->dir); ⟨rem.d⟩
+    else if (i->dir == NULL) {          // casos 1 e 2: sem filho direito ⟨rem.c1⟩
+        No* e = i->esq; ⟨rem.r1⟩
+        free(i); ⟨rem.r1del⟩
+        return e; ⟨rem.r1ret⟩
+    }
+    else if (i->esq == NULL) {          // caso 2: só filho direito ⟨rem.c2⟩
+        No* d = i->dir; ⟨rem.r2⟩
+        free(i); ⟨rem.r2del⟩
+        return d; ⟨rem.r2ret⟩
+    }
+    else
+        i->esq = maiorEsq(i, i->esq);   // caso 3: dois filhos ⟨rem.c3⟩
+    return balancear(i); ⟨rem.bal⟩
+}`,
+me: `// copia para i o antecessor (o maior da subárvore j) e remove o nó dele
+No* maiorEsq(No* i, No* j) { ⟨me.sig⟩
+    if (j->dir != NULL) { ⟨me.if⟩
+        j->dir = maiorEsq(i, j->dir); ⟨me.rec⟩
+        return balancear(j); ⟨me.bal⟩
+    }
+    i->elemento = j->elemento; ⟨me.copia⟩
+    No* e = j->esq; ⟨me.ret⟩
+    free(j); ⟨me.del⟩
+    return e; ⟨me.retE⟩
+}`,
+pesP: `bool arvorePesquisar(ArvoreAVL* a, int x) {
+    return pesquisar(x, a->raiz); ⟨pesP.call⟩
+}`,
+pes: `bool pesquisar(int x, No* i) { ⟨pes.sig⟩
+    if (i == NULL) ⟨pes.null⟩
+        return false; ⟨pes.f⟩
+    if (x == i->elemento) ⟨pes.eq⟩
+        return true; ⟨pes.t⟩
+    if (x < i->elemento) ⟨pes.lt⟩
+        return pesquisar(x, i->esq); ⟨pes.e⟩
+    return pesquisar(x, i->dir); ⟨pes.d⟩
+}`
+}
+};
+
+/* Convenção do fator de balanceamento:
+   'ed' = altura(esq) − altura(dir)  (padrão)     'de' = altura(dir) − altura(esq)
+   A variante 'de' é gerada a partir do texto 'ed' trocando a ordem da subtração no Fator
+   e espelhando as condições do Balancear (o ramo "pende para a esquerda" continua primeiro). */
+function troca(l, de, para) {                      // troca mantendo a coluna do comentário
+  const k = l.indexOf(de); if (k < 0) return l;
+  let r = l.slice(0, k) + para + l.slice(k + de.length);
+  const dif = para.length - de.length, c = r.indexOf('//');
+  if (c > 0 && dif !== 0) {
+    if (dif > 0 && r.slice(c - dif - 1, c - 1).trim() === '') r = r.slice(0, c - dif) + r.slice(c);
+    else if (dif < 0) r = r.slice(0, c) + ' '.repeat(-dif) + r.slice(c);
+  }
+  return r;
+}
+function bloco(lang, bl, conv = 'ed') {
+  let txt = SRC[lang][bl];
+  if (conv !== 'de') return txt;
+  if (bl === 'alt') {
+    txt = txt.replace(/(\w+\(i(?:\.|->)(?:Esq|esq)\)) - (\w+\(i(?:\.|->)(?:Dir|dir)\))/, '$2 - $1')
+             .replace('positivo = mais alta à esquerda', 'positivo = mais alta à direita');
+  }
+  if (bl === 'bal') {
+    txt = txt.split('\n').map(l => {
+      if (l.includes('⟨bal.if1⟩')) return troca(l, 'fb > 1', 'fb < -1');
+      if (l.includes('⟨bal.if2⟩')) return troca(l, 'fb < -1', 'fb > 1');
+      if (l.includes('⟨bal.if1b⟩')) return troca(l, ') < 0', ') > 0');
+      if (l.includes('⟨bal.if2b⟩')) return troca(l, ') > 0', ') < 0');
+      return l;
+    }).join('\n');
+  }
+  return txt;
+}
+
+/* Retira os marcadores: cada bloco vira { linhas, ids: {id: índice} } */
+const MARCA = /\s*⟨([^⟩]+)⟩\s*$/;
+function processa(txt) {
+  const linhas = [], ids = {};
+  txt.split('\n').forEach((l, n) => {
+    const mm = l.match(MARCA);
+    if (mm) { for (const id of mm[1].split(',')) ids[id] = n; l = l.replace(MARCA, ''); }
+    linhas.push(l.replace(/\s+$/, ''));
+  });
+  return { linhas, ids };
+}
+
+/* Visões exibidas por operação (blocos na ordem mostrada) */
+const VISAO = {
+  ins: ['insP', 'ins', 'bal', 'rd', 're', 'alt'],
+  rem: ['remP', 'rem', 'me', 'bal', 'rd', 're', 'alt'],
+  pes: ['pesP', 'pes']
+};
+function visao(lang, op, conv = 'ed') {
+  const linhas = [], ids = {};
+  VISAO[op].forEach((bl, q) => {
+    if (q) linhas.push('');
+    const p = processa(bloco(lang, bl, conv));
+    for (const id in p.ids) ids[id] = linhas.length + p.ids[id];
+    linhas.push(...p.linhas);
+  });
+  return { linhas, ids };
+}
+
+/* Arquivo completo (o que é exibido em "código completo" e compilado nos testes) */
+const NOMES_ARQ = { cs: 'ArvoreAVL.cs', java: 'ArvoreAVL.java', cpp: 'ArvoreAVL.cpp', c: 'arvore_avl.c' };
+function fonte(lang, conv = 'ed') {
+  const B = k => processa(bloco(lang, k, conv)).linhas;
+  const ind = (ls, n) => ls.map(l => l ? ' '.repeat(n) + l : l);
+  const junta = (ks, n) => ks.map(k => ind(B(k), n).join('\n')).join('\n\n');
+  const cab = '// Árvore AVL — Algoritmos e Estruturas de Dados — PUC Minas\n// Prof. Rodrigo Richard Gomes\n';
+  if (lang === 'cs') return cab + `using System;
+
+namespace AED
+{
+${ind(B('no'), 4).join('\n')}
+
+    public class ArvoreAVL
+    {
+        private No? _raiz = null;
+
+${junta(['insP', 'remP', 'pesP'], 8)}
+
+${junta(['alt', 'rd', 're', 'bal', 'ins', 'rem', 'me', 'pes'], 8)}
+    }
+}
+`;
+  if (lang === 'java') return cab + `${B('no').join('\n')}
+
+public class ArvoreAVL {
+    private No raiz = null;
+
+${junta(['insP', 'remP', 'pesP'], 4)}
+
+${junta(['alt', 'rd', 're', 'bal', 'ins', 'rem', 'me', 'pes'], 4)}
+}
+`;
+  if (lang === 'cpp') return cab + `#include <algorithm>
+#include <stdexcept>
+#include <string>
+
+${B('no').join('\n')}
+
+class ArvoreAVL {
+public:
+${junta(['insP', 'remP', 'pesP'], 4)}
+
+private:
+    No* raiz = nullptr;
+
+${junta(['alt', 'rd', 're', 'bal', 'ins', 'rem', 'me', 'pes'], 4)}
+};
+`;
+  return cab + `#include <stdio.h>
+#include <stdlib.h>
+#include <stdbool.h>
+
+${junta(['no', 'alt', 'rd', 're', 'bal', 'ins', 'me', 'rem', 'pes', 'insP', 'remP', 'pesP'], 0)}
+`;
+}
+
+if (typeof module !== 'undefined') module.exports = { SRC, processa, visao, fonte, NOMES_ARQ, VISAO, bloco };
+
+/* Núcleo do simulador de AVL: modelo + geração dos passos (espelha o código de codigo.js) */
+if (typeof module !== 'undefined' && typeof visao === 'undefined') { var { visao } = require('./codigo.js'); }
+
+const cap = s => s[0].toUpperCase() + s.slice(1);
+const LING = {
+  cs:   { nome: 'C#',   ac: (v, f) => `${v}.${cap(f)}`,  nul: 'null',    F: n => cap(n), raiz: '_raiz',   obj: 'objeto ArvoreAVL', libera: null,     excecao: 'InvalidOperationException' },
+  java: { nome: 'Java', ac: (v, f) => `${v}.${f}`,       nul: 'null',    F: n => n,      raiz: 'raiz',    obj: 'objeto ArvoreAVL', libera: null,     excecao: 'RuntimeException' },
+  cpp:  { nome: 'C++',  ac: (v, f) => `${v}->${f}`,      nul: 'nullptr', F: n => n,      raiz: 'raiz',    obj: 'objeto ArvoreAVL', libera: 'delete', excecao: 'std::runtime_error' },
+  c:    { nome: 'C',    ac: (v, f) => `${v}->${f}`,      nul: 'NULL',    F: n => n,      raiz: 'a->raiz', obj: 'ArvoreAVL a',       libera: 'free',   excecao: null }
+};
+// nome da função "pública" (envoltório) em cada linguagem
+const PUB = { ins: { c: 'arvoreInserir' }, rem: { c: 'arvoreRemover' }, pes: { c: 'arvorePesquisar' } };
+const nomePub = (lang, op, base) => (PUB[op][lang]) || LING[lang].F(base);
+
+/* ---------------- modelo ---------------- */
+class Modelo {
+  constructor() { this.nos = new Map(); this.raiz = null; this.prox = 1; }
+  novo(v) { const id = this.prox++; this.nos.set(id, { v, e: null, d: null, h: 0, livre: false }); return id; }
+  snap() { const o = {}; for (const [id, n] of this.nos) o[id] = { ...n }; return { raiz: this.raiz, nos: o }; }
+  restaura(s) { this.nos = new Map(Object.entries(s.nos).map(([k, n]) => [+k, { ...n }])); this.raiz = s.raiz; this.prox = Math.max(0, ...this.nos.keys()) + 1; }
+  limpa() { this.nos.clear(); this.raiz = null; this.prox = 1; }
+  H(i) { return i == null ? -1 : this.nos.get(i).h; }
+  atualiza(i) { const n = this.nos.get(i); n.h = 1 + Math.max(this.H(n.e), this.H(n.d)); }
+  fator(i) { const n = this.nos.get(i); return this.H(n.e) - this.H(n.d); }
+  rd(i) { const n = this.nos.get(i), j = n.e, nj = this.nos.get(j); n.e = nj.d; nj.d = i; this.atualiza(i); this.atualiza(j); return j; }
+  re(i) { const n = this.nos.get(i), j = n.d, nj = this.nos.get(j); n.d = nj.e; nj.e = i; this.atualiza(i); this.atualiza(j); return j; }
+  balancear(i) {
+    this.atualiza(i); const fb = this.fator(i), n = this.nos.get(i);
+    if (fb > 1) { if (this.fator(n.e) < 0) n.e = this.re(n.e); return this.rd(i); }
+    if (fb < -1) { if (this.fator(n.d) > 0) n.d = this.rd(n.d); return this.re(i); }
+    return i;
+  }
+  // operações diretas (sem passos): usadas na inserção em lote e nos testes
+  inserir(x) {
+    const ins = i => { if (i == null) return this.novo(x); const n = this.nos.get(i);
+      if (x < n.v) n.e = ins(n.e); else if (x > n.v) n.d = ins(n.d); else throw new Error(`Elemento ${x} já existe.`); return this.balancear(i); };
+    this.raiz = ins(this.raiz);
+  }
+  remover(x) {
+    const maior = (i, j) => { const nj = this.nos.get(j); if (nj.d != null) { nj.d = maior(i, nj.d); return this.balancear(j); }
+      this.nos.get(i).v = nj.v; this.nos.delete(j); return nj.e; };
+    const rem = i => { if (i == null) throw new Error(`Elemento ${x} não encontrado.`); const n = this.nos.get(i);
+      if (x < n.v) n.e = rem(n.e); else if (x > n.v) n.d = rem(n.d);
+      else if (n.d == null) { this.nos.delete(i); return n.e; }
+      else if (n.e == null) { this.nos.delete(i); return n.d; }
+      else n.e = maior(i, n.e);
+      return this.balancear(i); };
+    this.raiz = rem(this.raiz);
+  }
+  contem(x) { let i = this.raiz; while (i != null) { const n = this.nos.get(i); if (n.v === x) return true; i = x < n.v ? n.e : n.d; } return false; }
+  altura() { return this.H(this.raiz); }
+  pre() { const r = []; const f = i => { if (i == null) return; const n = this.nos.get(i); r.push(n.v + ':' + n.h); f(n.e); f(n.d); }; f(this.raiz); return r.join(' '); }
+}
+
+/* ---------------- gerador de passos ---------------- */
+const b = s => `<b>${s}</b>`;
+const c = s => `<code>${s}</code>`;
+const sinal = n => (n > 0 ? '+' : '') + n;
+
+class Trace {
+  constructor(m, lang, op, conv = 'ed') {
+    this.m = m; this.lang = lang; this.L = LING[lang]; this.op = op; this.conv = conv; this.V = visao(lang, op, conv);
+    this.rotacao = null; this.rotacoes = [];
+    this.passos = []; this.pilha = []; this.marca = {}; this.aresta = {}; this.pend = new Set(); this.removidos = new Set();
+    this.raizTxt = null;
+  }
+  ref(id) { return id == null ? this.L.nul : `n(${this.m.nos.get(id).v})`; }
+  A(v, f) { return this.L.ac(v, f); }
+  F(n) { return this.L.F(n); }
+  dest(d) { return d.raiz ? this.L.raiz : this.A(`n(${this.m.nos.get(d.no).v})`, d.lado === 'E' ? 'esq' : 'dir'); }
+  passo(id, nota, ptr = {}, extra = {}) {
+    const linha = this.V.ids[id];
+    if (linha === undefined) throw new Error(`linha sem marcador: ${this.lang}/${this.op}/${id}`);
+    this.passos.push({ op: this.op, linha, nota, ptr, snap: this.m.snap(), marca: { ...this.marca }, aresta: { ...this.aresta },
+      pend: [...this.pend], pilha: this.pilha.map(f => ({ nome: f.nome, vars: f.vars.map(v => [...v]), aguarda: f.aguarda })),
+      raiz: this.raizTxt ?? this.ref(this.m.raiz), conv: this.conv, rotacao: this.rotacao ? { ...this.rotacao } : null, ...extra });
+  }
+  alvo(id, d) { return id != null ? { no: id } : d.raiz ? { vazio: true } : { nulo: [d.no, d.lado] }; }
+  topo() { return this.pilha[this.pilha.length - 1]; }
+  setVar(nome, valor) { const f = this.topo(); const v = f.vars.find(q => q[0] === nome); if (v) { v.length = 0; v.push(...valor); } else f.vars.push(valor); }
+  // atribuição feita por quem chamou: liga r em dest e descarta o nó removido (se for o caso)
+  liga(d, r) {
+    let antigo;
+    if (d.raiz) { antigo = this.m.raiz; this.m.raiz = r; }
+    else { const n = this.m.nos.get(d.no), k = d.lado === 'E' ? 'e' : 'd'; antigo = n[k]; n[k] = r; }
+    const novo = this.pend.has(r); this.pend.delete(r);
+    if (antigo != null && antigo !== r && this.removidos.has(antigo)) { this.m.nos.delete(antigo); this.removidos.delete(antigo); }
+    return { antigo, novo };
+  }
+  txtLiga(d, r, { antigo, novo }) {
+    const q = `${c(this.dest(d) + ' = ' + this.ref(r))}`;
+    if (novo) return `De volta: ${q} ${b('(liga o novo nó)')}`;
+    if (antigo === r) return `De volta: ${q} (não muda nada)`;
+    return `De volta: ${q}: ${b(r == null ? 'agora a referência é ' + this.L.nul : 'a subárvore agora começa em ' + this.ref(r))}`;
+  }
+
+  /* ---- AtualizarAltura e Fator: um passo cada, sem abrir registro na pilha ---- */
+  txtAltura(i) {
+    const n = this.m.nos.get(i), he = this.m.H(n.e), hd = this.m.H(n.d), antes = n.h;
+    this.m.atualiza(i);
+    const A = this.F('altura');
+    return `${c(this.F('atualizarAltura') + '(' + this.ref(i) + ')')}: altura = 1 + máx(${A}(${this.A('i', 'esq')}), ${A}(${this.A('i', 'dir')})) = 1 + máx(${he}, ${hd}) = ${b(n.h)}${antes !== n.h ? ` (era ${antes})` : ''}`;
+  }
+
+  /* ---- rotações ---- */
+  rot(tipo, i, d) {
+    const L = this.L, m = this.m, dir = tipo === 'rd';
+    const fe = dir ? 'esq' : 'dir', fo = dir ? 'dir' : 'esq';          // fe: lado de onde j sobe; fo: lado oposto
+    const ke = dir ? 'e' : 'd', ko = dir ? 'd' : 'e';
+    const nome = this.F(dir ? 'rotacionarDir' : 'rotacionarEsq');
+    this.pilha.push({ nome: `${nome}(i)`, vars: [['i', this.ref(i), i], ['j', '?']] });
+    const ni = m.nos.get(i), j = ni[ke], nj = m.nos.get(j);
+    const ptr = () => ({ i: { no: i }, ...(this.topo().vars[1].length === 3 ? { j: { no: j } } : {}) });
+    this.marca[i] = 'desb';
+    this.passo(tipo + '.sig', `${b(dir ? 'Rotação simples à direita' : 'Rotação simples à esquerda')} em ${c(this.ref(i))}${this.rotacao && this.rotacao.nome.includes('dupla') ? ` (${this.rotacao.etapa.split(':')[0]} da ${this.rotacao.nome})` : ''}: o filho ${dir ? 'esquerdo' : 'direito'} vai subir e ${c(this.ref(i))} vai descer para a ${dir ? 'direita' : 'esquerda'} dele.`, ptr());
+    this.setVar('j', ['j', this.ref(j), j]); this.marca[j] = 'giro';
+    this.passo(tipo + '.j', `${c('j = ' + this.A('i', fe) + ' = ' + this.ref(j))}: ${c('j')} é o nó que vai subir.`, ptr());
+    const t2 = nj[ko];
+    ni[ke] = t2;
+    this.passo(tipo + '.a', `${c(this.A('i', fe) + ' = ' + this.A('j', fo) + ' = ' + this.ref(t2))}: ${t2 == null ? `${c('i')} perde o filho ${dir ? 'esquerdo' : 'direito'} (${c('j')} não tinha filho ${dir ? 'direito' : 'esquerdo'})` : `a subárvore de ${c(this.ref(t2))} ${b('muda de pai')}: sai de ${c('j')} e passa para ${c('i')} (continua entre os dois na ordem)`}.`, ptr(), { atrib: { no: i, lado: dir ? 'E' : 'D' } });
+    nj[ko] = i;
+    if (this.aresta[i]) { delete this.aresta[i]; this.aresta[j] = 'cam'; }
+    this.passo(tipo + '.b', `${c(this.A('j', fo) + ' = i')}: ${c(this.ref(i))} desce e vira filho ${dir ? 'direito' : 'esquerdo'} de ${c(this.ref(j))}. Quem chamou ainda aponta para ${c(this.ref(i))} até receber o retorno.`, ptr(), { atrib: { no: j, lado: dir ? 'D' : 'E' } });
+    this.passo(tipo + '.hi', this.txtAltura(i) + ' (primeiro o nó que desceu)', ptr());
+    this.passo(tipo + '.hj', this.txtAltura(j) + ' (depois o nó que subiu)', ptr());
+    delete this.marca[i];
+    this.passo(tipo + '.ret', `${c('return j')}: devolve ${c(this.ref(j))}, a nova raiz desta subárvore, que vai parar em ${c(this.dest(d))}.`, ptr(), { ret: { de: j, para: d } });
+    delete this.marca[j];
+    this.pilha.pop();
+    return j;
+  }
+
+  /* ---- Balancear ---- */
+  // fator na convenção escolhida: 'ed' = alt(esq) − alt(dir); 'de' = alt(dir) − alt(esq)
+  fb(i) { const f = this.m.fator(i); return this.conv === 'de' ? -f : f; }
+  balancear(i, d) {
+    const m = this.m, n = m.nos.get(i), ed = this.conv !== 'de';
+    this.pilha.push({ nome: `${this.F('balancear')}(i)`, vars: [['i', this.ref(i), i], ['fb', '?']] });
+    const p = { i: { no: i } };
+    this.passo('bal.sig', `${c(this.F('balancear') + '(' + this.ref(i) + ')')}: atualiza a altura de ${c(this.ref(i))} e confere se ele ficou desbalanceado.`, p);
+    this.passo('bal.h', this.txtAltura(i), p);
+    const he = m.H(n.e), hd = m.H(n.d), bruto = he - hd, fb = ed ? bruto : -bruto;
+    this.setVar('fb', ['fb', sinal(fb)]);
+    const desb = Math.abs(fb) > 1;
+    if (desb) this.marca[i] = 'desb';
+    const A = this.F('altura'), Fa = this.F('fator');
+    const conta = ed ? `${A}(${this.A('i', 'esq')}) − ${A}(${this.A('i', 'dir')}) = ${he} − (${hd})` : `${A}(${this.A('i', 'dir')}) − ${A}(${this.A('i', 'esq')}) = ${hd} − (${he})`;
+    this.passo('bal.fb', `${c('fb = ' + Fa + '(i)')} = ${conta} = ${b(sinal(fb))}: ${desb ? b('desbalanceado') + ` (pende para a ${bruto > 0 ? 'esquerda' : 'direita'})` : 'balanceado (−1, 0 ou +1)'}.`, p);
+    const condE = ed ? 'fb > 1' : 'fb < -1', condD = ed ? 'fb < -1' : 'fb > 1';
+    this.passo('bal.if1', `${c(condE)}? ${b(bruto > 1)}${bruto > 1 ? ': a subárvore esquerda está 2 níveis mais alta' : ''}`, p);
+    const nomes = { rd: 'rotação simples à direita', re: 'rotação simples à esquerda', dd: 'rotação dupla à direita', de: 'rotação dupla à esquerda' };
+    const ramo = (esq) => {
+      // esq = true: pende para a esquerda
+      const lado = esq ? 'esquerda' : 'direita', oposto = esq ? 'direita' : 'esquerda';
+      const fc = esq ? n.e : n.d, campo = esq ? 'esq' : 'dir';
+      const brutoF = m.fator(fc), f2 = ed ? brutoF : -brutoF;
+      const dupla = esq ? brutoF < 0 : brutoF > 0;
+      const condF = `${Fa}(${this.A('i', campo)}) ${esq === ed ? '<' : '>'} 0`;
+      const tipo = dupla ? (esq ? 'dd' : 'de') : (esq ? 'rd' : 're');
+      const pendeF = brutoF === 0 ? 'está equilibrado (fb = 0)' : `pende para a ${brutoF > 0 ? 'esquerda' : 'direita'} (fb = ${sinal(f2)})`;
+      const motivo = `${c(this.ref(i))} tem fb = ${b(sinal(fb))}: pende para a ${b(lado)}. O filho ${esq ? 'esquerdo' : 'direito'} ${c(this.ref(fc))} ${pendeF}` +
+        (dupla ? `, ou seja, para o lado ${b('oposto')}. Uma rotação simples não resolveria: primeiro uma simples à ${lado} em ${c(this.ref(fc))}, que alinha os três nós, depois uma simples à ${oposto} em ${c(this.ref(i))}.`
+               : `${brutoF === 0 ? '' : ', o mesmo lado'}. Basta uma rotação simples à ${oposto} em ${c(this.ref(i))}: o filho ${esq ? 'esquerdo' : 'direito'} sobe.`);
+      this.rotacao = { nome: nomes[tipo], no: m.nos.get(i).v, motivo, etapa: dupla ? 'decisão' : null };
+      this.rotacoes.push(`${nomes[tipo].replace('rotação ', '')} em ${m.nos.get(i).v}`);
+      this.passo(esq ? 'bal.if1b' : 'bal.if2b', `${c(condF)}? ${Fa}(${this.ref(fc)}) = ${sinal(f2)}: ${b(dupla)}. Decisão: ${b(nomes[tipo])}.`, p);
+      if (dupla) {
+        const dd = { no: i, lado: esq ? 'E' : 'D' };
+        this.topo().aguarda = this.A('i', campo);
+        this.rotacao.etapa = `1ª etapa: simples à ${lado} em ${this.ref(fc)}`;
+        this.passo(esq ? 'bal.r1b' : 'bal.r2b', `1ª etapa da ${nomes[tipo]}: chama ${c(this.F(esq ? 'rotacionarEsq' : 'rotacionarDir') + '(' + this.A('i', campo) + ')')}; o resultado será guardado em ${c(this.A('i', campo))}.`, p);
+        const r = this.rot(esq ? 're' : 'rd', fc, dd);
+        const inf = this.liga(dd, r);
+        this.passo(esq ? 'bal.r1b' : 'bal.r2b', this.txtLiga(dd, r, inf) + `. Agora o filho ${esq ? 'esquerdo' : 'direito'} pende para o mesmo lado que ${c(this.ref(i))}: falta a rotação simples à ${oposto}.`, p, { atrib: dd });
+        this.topo().aguarda = undefined;
+        this.rotacao.etapa = `2ª etapa: simples à ${oposto} em ${this.ref(i)}`;
+      }
+      this.topo().aguarda = 'retorno';
+      this.passo(esq ? 'bal.r1' : 'bal.r2', `${dupla ? `2ª etapa da ${nomes[tipo]}` : cap(nomes[tipo])}: chama ${c(this.F(esq ? 'rotacionarDir' : 'rotacionarEsq') + '(i)')}; o resultado será devolvido por ${c(this.F('balancear'))}.`, p);
+      const r = this.rot(esq ? 'rd' : 're', i, d);
+      this.topo().aguarda = undefined;
+      this.rotacao.etapa = 'concluída';
+      this.passo(esq ? 'bal.r1' : 'bal.r2', `${cap(nomes[tipo])} concluída. ${c(this.F('balancear'))} devolve ${c(this.ref(r))}, a nova raiz da subárvore, que vai parar em ${c(this.dest(d))}.`, { i: { no: i } }, { ret: { de: r, para: d } });
+      this.rotacao = null;
+      this.pilha.pop(); return r;
+    };
+    if (bruto > 1) return ramo(true);
+    this.passo('bal.if2', `${c(condD)}? ${b(bruto < -1)}${bruto < -1 ? ': a subárvore direita está 2 níveis mais alta' : ''}`, p);
+    if (bruto < -1) return ramo(false);
+    this.passo('bal.ret', `${c('return i')}: nenhuma rotação é necessária; devolve ${c(this.ref(i))}, que vai parar em ${c(this.dest(d))}.`, p, { ret: { de: i, para: d } });
+    this.pilha.pop(); return i;
+  }
+}
+
+const resumoRot = t => t.rotacoes.length ? `Rotaç${t.rotacoes.length > 1 ? 'ões' : 'ão'} aplicada${t.rotacoes.length > 1 ? 's' : ''}: ${b(t.rotacoes.join('; '))}.` : 'Nenhuma rotação foi necessária.';
+
+/* ---------------- inserção ---------------- */
+function traceInserir(m, x, lang, conv = 'ed') {
+  const t = new Trace(m, lang, 'ins', conv), L = t.L, F = n => t.F(n);
+  const pub = nomePub(lang, 'ins', 'inserir');
+  const quadro0 = () => ({ nome: lang === 'c' ? `${pub}(a, x)` : `${pub}(int x)`, vars: [['x', x]] });
+  t.pilha = [quadro0()]; t.pilha[0].aguarda = L.raiz;
+  t.passo('insP.call', `Chamada ${c(`${pub}(${lang === 'c' ? 'a, ' : ''}${x})`)}: chama a versão recursiva passando ${c(L.raiz)}; o resultado será guardado em ${c(L.raiz)}.`);
+  t.raizTxt = t.ref(m.raiz);
+  let erro = false, dup = false;
+  const rec = (i, d) => {
+    t.pilha.push({ nome: `${F('inserir')}(x, i)`, vars: [['x', x], ['i', t.ref(i), i]] });
+    const a = t.alvo(i, d);
+    if (i != null) { t.marca[i] = 'cam'; if (!d.raiz) t.aresta[i] = 'cam'; }
+    t.passo('ins.sig', `Nova chamada: ${c('i = ' + t.ref(i))}.`, { i: a });
+    t.passo('ins.null', `${c('i == ' + L.nul)}? ${b(i == null)}`, { i: a });
+    if (i == null) {
+      const id = m.novo(x);
+      if (d.raiz) m.raiz = id; else m.nos.get(d.no)[d.lado === 'E' ? 'e' : 'd'] = id;
+      t.pend.add(id); t.marca[id] = 'novo';
+      t.passo('ins.new', `Cria o nó ${c(`n(${x})`)}, com altura 0 (é uma folha), e ${b('devolve')} sua referência, que vai parar em ${c(t.dest(d))}.`, {}, { ret: { de: id, para: d } });
+      t.pilha.pop(); return id;
+    }
+    const n = m.nos.get(i), v = n.v;
+    if (x < v || x > v) {
+      const esq = x < v, dd = { no: i, lado: esq ? 'E' : 'D' }, campo = esq ? 'esq' : 'dir';
+      t.passo('ins.lt', `${c(`${x} < ${v}`)}? ${b(esq)}${esq ? ': o lugar do ' + x + ' é à esquerda' : ''}`, { i: a });
+      if (!esq) t.passo('ins.gt', `${c(`${x} > ${v}`)}? ${b('true')}: o lugar do ${x} é à direita`, { i: a });
+      t.topo().aguarda = t.A('i', campo);
+      t.passo(esq ? 'ins.e' : 'ins.d', `Chama ${c(`${F('inserir')}(x, ${t.A('i', campo)})`)}; o resultado será guardado em ${c(t.A('i', campo))}.`, { i: a });
+      const r = rec(n[esq ? 'e' : 'd'], dd); if (erro) return i;
+      const inf = t.liga(dd, r);
+      t.passo(esq ? 'ins.e' : 'ins.d', t.txtLiga(dd, r, inf) + '.', { i: a }, { atrib: dd });
+      t.topo().aguarda = undefined;
+    } else {
+      t.passo('ins.lt', `${c(`${x} < ${v}`)}? ${b('false')}`, { i: a });
+      t.passo('ins.gt', `${c(`${x} > ${v}`)}? ${b('false')}`, { i: a });
+      t.marca[i] = 'erro';
+      if (lang === 'c') {
+        dup = true;
+        t.passo('ins.err', `O ${x} ${b('já existe')}. Em C não há exceções: a função devolve ${c(t.ref(i))} sem inserir nada, que vai parar em ${c(t.dest(d))}.`, { i: a }, { ret: { de: i, para: d } });
+        t.pilha.pop(); return i;
+      }
+      t.passo('ins.err', `O ${x} ${b('já existe')}: lança ${c(L.excecao)} e a inserção é interrompida.`, { i: a }, { erro: true });
+      erro = true; return i;
+    }
+    t.topo().aguarda = 'retorno';
+    t.passo('ins.bal', `Antes de devolver ${c('i')}, chama ${c(F('balancear') + '(i)')} para ${c(t.ref(i))}.`, { i: a });
+    const r = t.balancear(i, d);
+    t.topo().aguarda = undefined;
+    if (t.marca[i] === 'cam' || t.marca[i] === 'desb') t.marca[i] = 'ok';
+    t.passo('ins.bal', `${c(`return ${F('balancear')}(i)`)}: devolve ${c(t.ref(r))}, que vai parar em ${c(t.dest(d))}.`, { i: { no: i } }, { ret: { de: r, para: d } });
+    t.pilha.pop(); return r;
+  };
+  const r = rec(m.raiz, { raiz: true });
+  if (erro) { t.pilha = []; t.raizTxt = null; t.marca = {}; t.aresta = {}; t.passo('insP.fim', `A exceção chega a quem chamou ${c(`${pub}(${x})`)}. A árvore não mudou.`, {}, { erro: true }); return t.passos; }
+  t.pilha = [quadro0()];
+  t.raizTxt = null;
+  const inf = t.liga({ raiz: true }, r);
+  t.passo('insP.call', t.txtLiga({ raiz: true }, r, inf).replace('De volta:', 'De volta à chamada inicial:'), {}, { atrib: { raiz: true } });
+  t.pilha = []; t.marca = {}; t.aresta = {};
+  const novo = [...m.nos].find(([, n]) => n.v === x);
+  if (novo) t.marca[novo[0]] = 'novo';
+  t.passo('insP.fim', dup ? `Fim: o ${x} já estava na árvore; nada mudou.` : `Fim: ${x} inserido. ${resumoRot(t)} A árvore continua AVL: em todo nó, o fator de balanceamento é −1, 0 ou +1.`, {}, { rotacoes: t.rotacoes });
+  return t.passos;
+}
+
+/* ---------------- remoção ---------------- */
+function traceRemover(m, x, lang, conv = 'ed') {
+  const t = new Trace(m, lang, 'rem', conv), L = t.L, F = n => t.F(n);
+  const pub = nomePub(lang, 'rem', 'remover');
+  const quadro0 = () => ({ nome: lang === 'c' ? `${pub}(a, x)` : `${pub}(int x)`, vars: [['x', x]] });
+  t.pilha = [quadro0()]; t.pilha[0].aguarda = L.raiz;
+  t.passo('remP.call', `Chamada ${c(`${pub}(${lang === 'c' ? 'a, ' : ''}${x})`)}: chama a versão recursiva passando ${c(L.raiz)}.`);
+  t.raizTxt = t.ref(m.raiz);
+  let erro = false, achou = false;
+  const libera = (id, nomeVar, rotulo) => {
+    m.nos.get(id).livre = true;
+    t.passo(rotulo, `${c(L.libera + (L.libera === 'free' ? '(' + nomeVar + ')' : ' ' + nomeVar))}: devolve ao sistema a memória do nó removido. Quem chamou ainda guarda o endereço antigo até receber o retorno.`, { [nomeVar]: { no: id } });
+  };
+  const maior = (i, j, d) => {
+    t.pilha.push({ nome: `${F('maiorEsq')}(i, j)`, vars: [['i', t.ref(i), i], ['j', t.ref(j), j]] });
+    t.marca[j] = 'roxo'; t.aresta[j] = 'cam';
+    const p = () => ({ i: { no: i }, j: { no: j } });
+    t.passo('me.sig', `Procura o antecessor a partir de ${c('j = ' + t.ref(j))}.`, p());
+    const nj = m.nos.get(j);
+    t.passo('me.if', `${c(t.A('j', 'dir') + ' != ' + L.nul)}? ${b(nj.d != null)}`, p());
+    if (nj.d != null) {
+      const dd = { no: j, lado: 'D' };
+      t.topo().aguarda = t.A('j', 'dir');
+      t.passo('me.rec', `Desce à direita: ${c(`${F('maiorEsq')}(i, ${t.A('j', 'dir')})`)}; o resultado será guardado em ${c(t.A('j', 'dir'))}.`, p());
+      const r = maior(i, nj.d, dd);
+      const inf = t.liga(dd, r);
+      t.passo('me.rec', t.txtLiga(dd, r, inf) + (inf.antigo !== r ? ': o nó original do antecessor saiu da árvore' : '') + '.', p(), { atrib: dd });
+      t.topo().aguarda = 'retorno';
+      t.passo('me.bal', `Na volta, ${c('j')} pode ter ficado desbalanceado: chama ${c(F('balancear') + '(j)')}.`, p());
+      const r2 = t.balancear(j, d);
+      t.topo().aguarda = undefined;
+      if (t.marca[j] === 'desb') t.marca[j] = 'roxo';
+      t.passo('me.bal', `${c(`return ${F('balancear')}(j)`)}: devolve ${c(t.ref(r2))}, que vai parar em ${c(t.dest(d))}.`, p(), { ret: { de: r2, para: d } });
+      t.pilha.pop(); return r2;
+    }
+    m.nos.get(i).v = nj.v;
+    t.marca[i] = 'achou'; t.marca[j] = 'erro'; t.removidos.add(j);
+    t.topo().vars = [['i', t.ref(i), i], ['j', t.ref(j), j]];
+    t.passo('me.copia', `${c(t.A('j', 'dir'))} é ${c(L.nul)}: ${c('j')} é o ${b('antecessor')} (${nj.v}). O nó ${c('i')} passa a guardar ${nj.v}; falta tirar da árvore o nó original do ${nj.v}.`, p());
+    if (L.libera) {
+      t.setVar('e', ['e', t.ref(nj.e), nj.e]);
+      t.passo('me.ret', `${c('e = ' + t.A('j', 'esq') + ' = ' + t.ref(nj.e))}: guarda o filho esquerdo de ${c('j')} antes de liberar ${c('j')}.`, p());
+      libera(j, 'j', 'me.del');
+      t.passo('me.retE', `${c('return e')}: devolve ${c(t.ref(nj.e))}, que vai parar em ${c(t.dest(d))} no lugar de ${c('j')}.`, p(), { ret: { de: nj.e, para: d } });
+    } else {
+      t.passo('me.ret', `${c('return ' + t.A('j', 'esq'))}: devolve ${c(t.ref(nj.e))}, que vai parar em ${c(t.dest(d))} no lugar de ${c('j')}.`, p(), { ret: { de: nj.e, para: d } });
+    }
+    t.pilha.pop(); return nj.e;
+  };
+  const rec = (i, d) => {
+    t.pilha.push({ nome: `${F('remover')}(x, i)`, vars: [['x', x], ['i', t.ref(i), i]] });
+    const a = t.alvo(i, d);
+    if (i != null) { t.marca[i] = 'cam'; if (!d.raiz) t.aresta[i] = 'cam'; }
+    t.passo('rem.sig', `Nova chamada: ${c('i = ' + t.ref(i))}.`, { i: a });
+    t.passo('rem.null', `${c('i == ' + L.nul)}? ${b(i == null)}`, { i: a });
+    if (i == null) {
+      if (lang === 'c') {
+        t.passo('rem.err', `O ${x} ${b('não está')} na árvore. Em C não há exceções: a função devolve ${c('NULL')}, que vai parar em ${c(t.dest(d))} (onde já havia ${c('NULL')}).`, { i: a }, { ret: { de: null, para: d } });
+        t.pilha.pop(); return null;
+      }
+      t.passo('rem.err', `O ${x} ${b('não está')} na árvore: lança ${c(L.excecao)}.`, { i: a }, { erro: true });
+      erro = true; return null;
+    }
+    const n = m.nos.get(i), v = n.v;
+    if (x !== v) {
+      const esq = x < v, dd = { no: i, lado: esq ? 'E' : 'D' }, campo = esq ? 'esq' : 'dir';
+      t.passo('rem.lt', `${c(`${x} < ${v}`)}? ${b(esq)}`, { i: a });
+      if (!esq) t.passo('rem.gt', `${c(`${x} > ${v}`)}? ${b('true')}`, { i: a });
+      t.topo().aguarda = t.A('i', campo);
+      t.passo(esq ? 'rem.e' : 'rem.d', `Chama ${c(`${F('remover')}(x, ${t.A('i', campo)})`)}; o resultado será guardado em ${c(t.A('i', campo))}.`, { i: a });
+      const r = rec(n[esq ? 'e' : 'd'], dd); if (erro) return i;
+      const inf = t.liga(dd, r);
+      t.passo(esq ? 'rem.e' : 'rem.d', t.txtLiga(dd, r, inf) + '.', { i: a }, { atrib: dd });
+      t.topo().aguarda = undefined;
+    } else {
+      achou = true;
+      t.passo('rem.lt', `${c(`${x} < ${v}`)}? ${b('false')}`, { i: a });
+      t.passo('rem.gt', `${c(`${x} > ${v}`)}? ${b('false')}: ${b('achou')} o nó a remover.`, { i: a });
+      t.marca[i] = 'erro';
+      if (n.d == null || n.e == null) {
+        const semDir = n.d == null, filho = semDir ? n.e : n.d, campo = semDir ? 'esq' : 'dir', nv = semDir ? 'e' : 'd';
+        if (!semDir) t.passo('rem.c1', `${c(t.A('i', 'dir') + ' == ' + L.nul)}? ${b('false')}`, { i: a });
+        const caso = semDir ? (n.e == null ? 'é uma folha (caso 1)' : 'só tem filho esquerdo (caso 2)') : 'só tem filho direito (caso 2)';
+        t.passo(semDir ? 'rem.c1' : 'rem.c2', `${c(t.A('i', semDir ? 'dir' : 'esq') + ' == ' + L.nul)}? ${b('true')}: o nó ${caso}.`, { i: a });
+        t.removidos.add(i);
+        const r = semDir ? 'rem.r1' : 'rem.r2';
+        if (L.libera) {
+          t.setVar(nv, [nv, t.ref(filho), filho]);
+          t.passo(r, `${c(nv + ' = ' + t.A('i', campo) + ' = ' + t.ref(filho))}: guarda o filho antes de liberar o nó.`, { i: a });
+          libera(i, 'i', r + 'del');
+          t.passo(r + 'ret', `${c('return ' + nv)}: devolve ${c(t.ref(filho))}, que vai parar em ${c(t.dest(d))} no lugar do nó ${v}.`, {}, { ret: { de: filho, para: d } });
+        } else {
+          t.passo(r, `${c('return ' + t.A('i', campo))}: devolve ${c(t.ref(filho))}, que vai parar em ${c(t.dest(d))} no lugar do nó ${v}. Essa subárvore já era AVL: não precisa balancear aqui.`, { i: a }, { ret: { de: filho, para: d } });
+        }
+        t.pilha.pop(); return filho;
+      }
+      t.passo('rem.c1', `${c(t.A('i', 'dir') + ' == ' + L.nul)}? ${b('false')}`, { i: a });
+      t.passo('rem.c2', `${c(t.A('i', 'esq') + ' == ' + L.nul)}? ${b('false')}: o nó tem ${b('dois filhos')} (caso 3).`, { i: a });
+      const dd = { no: i, lado: 'E' };
+      t.topo().aguarda = t.A('i', 'esq');
+      t.passo('rem.c3', `Chama ${c(`${F('maiorEsq')}(i, ${t.A('i', 'esq')})`)}; o resultado será guardado em ${c(t.A('i', 'esq'))}.`, { i: a });
+      const r = maior(i, n.e, dd);
+      const inf = t.liga(dd, r);
+      for (const k in t.marca) if (t.marca[k] === 'roxo') delete t.marca[k];
+      t.passo('rem.c3', t.txtLiga(dd, r, inf) + '.', { i: a }, { atrib: dd });
+      t.topo().aguarda = undefined;
+    }
+    t.topo().aguarda = 'retorno';
+    t.passo('rem.bal', `Na volta, ${c(t.ref(i))} pode ter ficado desbalanceado: chama ${c(F('balancear') + '(i)')}.`, { i: a });
+    const r = t.balancear(i, d);
+    t.topo().aguarda = undefined;
+    if (['cam', 'desb'].includes(t.marca[i])) t.marca[i] = 'ok';
+    t.passo('rem.bal', `${c(`return ${F('balancear')}(i)`)}: devolve ${c(t.ref(r))}, que vai parar em ${c(t.dest(d))}.`, { i: { no: i } }, { ret: { de: r, para: d } });
+    t.pilha.pop(); return r;
+  };
+  const r = rec(m.raiz, { raiz: true });
+  if (erro) { t.pilha = []; t.raizTxt = null; t.marca = {}; t.aresta = {}; t.passo('remP.fim', `A exceção chega a quem chamou ${c(`${pub}(${x})`)}. A árvore não mudou.`, {}, { erro: true }); return t.passos; }
+  t.pilha = [quadro0()];
+  t.raizTxt = null;
+  const inf = t.liga({ raiz: true }, r);
+  t.passo('remP.call', t.txtLiga({ raiz: true }, r, inf).replace('De volta:', 'De volta à chamada inicial:'), {}, { atrib: { raiz: true } });
+  t.pilha = []; t.marca = {}; t.aresta = {};
+  t.passo('remP.fim', achou ? `Fim: ${x} removido. ${resumoRot(t)} A árvore continua AVL.` : `Fim: o ${x} não estava na árvore; nada mudou.`, {}, { rotacoes: t.rotacoes });
+  return t.passos;
+}
+
+/* ---------------- pesquisa ---------------- */
+function tracePesquisar(m, x, lang, conv = 'ed') {
+  const t = new Trace(m, lang, 'pes', conv), L = t.L, F = n => t.F(n);
+  const pub = nomePub(lang, 'pes', 'pesquisar');
+  const quadro0 = () => ({ nome: lang === 'c' ? `${pub}(a, x)` : `${pub}(int x)`, vars: [['x', x]] });
+  t.pilha = [quadro0()];
+  t.passo('pesP.call', `Chamada ${c(`${pub}(${lang === 'c' ? 'a, ' : ''}${x})`)}.`);
+  const rec = (i, d) => {
+    t.pilha.push({ nome: `${F('pesquisar')}(x, i)`, vars: [['x', x], ['i', t.ref(i), i]] });
+    const a = t.alvo(i, d);
+    if (i != null) { t.marca[i] = 'cam'; if (!d.raiz) t.aresta[i] = 'cam'; }
+    t.passo('pes.sig', `Nova chamada com ${c('i = ' + t.ref(i))}.`, { i: a });
+    t.passo('pes.null', `${c('i == ' + L.nul)}? ${b(i == null)}`, { i: a });
+    if (i == null) { t.passo('pes.f', `Chegou a ${c(L.nul)}: o ${x} não está na árvore. ${b('Devolve false')}.`, { i: a }); t.pilha.pop(); return false; }
+    const v = m.nos.get(i).v;
+    t.passo('pes.eq', `${c(`${x} == ${v}`)}? ${b(x === v)}`, { i: a });
+    if (x === v) { t.marca[i] = 'achou'; t.passo('pes.t', `Encontrou: ${b('devolve true')}.`, { i: a }); t.pilha.pop(); return true; }
+    const esq = x < v;
+    t.passo('pes.lt', `${c(`${x} < ${v}`)}? ${b(esq)}: só pode estar à ${esq ? 'esquerda' : 'direita'}.`, { i: a });
+    t.passo(esq ? 'pes.e' : 'pes.d', `Chama ${c(`${F('pesquisar')}(x, ${t.A('i', esq ? 'esq' : 'dir')})`)}.`, { i: a });
+    const r = rec(m.nos.get(i)[esq ? 'e' : 'd'], { no: i, lado: esq ? 'E' : 'D' });
+    t.passo(esq ? 'pes.e' : 'pes.d', `Repassa o resultado: ${b('devolve ' + r)}.`, { i: a });
+    t.pilha.pop(); return r;
+  };
+  const r = rec(m.raiz, { raiz: true });
+  t.pilha = [quadro0()];
+  t.passo('pesP.call', `${c(`${pub}(${x})`)} devolve ${b(r)}. Numa AVL com n nós a altura é O(log n), então a pesquisa faz no máximo O(log n) comparações.`, {}, { resultado: r });
+  return t.passos;
+}
+
+if (typeof module !== 'undefined') module.exports = { Modelo, traceInserir, traceRemover, tracePesquisar, LING };
+
+{
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+const KW = /\b(public|private|void|int|bool|boolean|if|else|return|new|throw|null|nullptr|NULL|class|struct|typedef|while|namespace|using|true|false|delete|this|static|sizeof)\b/g;
+function colore(l) {
+  let com = '', i = l.indexOf('//');
+  if (i >= 0) { com = '<span class="cm">' + esc(l.slice(i)) + '</span>'; l = l.slice(0, i); }
+  if (l.trimStart().startsWith('#')) return '<span class="kw">' + esc(l) + '</span>' + com;
+  const partes = l.split(/("[^"]*")/);
+  return partes.map((p, k) => k % 2 ? '<span class="st">' + esc(p) + '</span>' : esc(p).replace(KW, '<span class="kw">$1</span>')).join('') + com;
+}
+const guarda = (k, v) => { try { localStorage.setItem(k, v); } catch {} };
+const le = k => { try { return localStorage.getItem(k); } catch { return null; } };
+
+const m = new Modelo();
+let lang = ['c', 'cpp', 'java', 'cs'].includes(le('avlLang')) ? le('avlLang') : 'cs';
+let conv = le('avlFb') === 'de' ? 'de' : 'ed';
+let passos = [], k = 0, timer = null, codAtual = null, posAnt = new Map(), anim = null;
+let ultima = null;      // { tipo, x, antes } — para refazer a operação ao trocar de linguagem
+
+/* ---------------- código ---------------- */
+const TIT = {
+  ins: { cs: 'Inserir, Balancear e rotações', o: 'inserir, balancear e rotações' },
+  rem: { cs: 'Remover, MaiorEsq, Balancear e rotações', o: 'remover, maiorEsq, balancear e rotações' },
+  pes: { cs: 'Pesquisar', o: 'pesquisar' }
+};
+function mostraCodigo(op, linha, erro) {
+  const chave = lang + '|' + conv + '|' + op;
+  if (chave !== codAtual) {
+    $('cod').innerHTML = visao(lang, op, conv).linhas.map((l, n) => `<div><span class="n">${n + 1}</span>${colore(l)}</div>`).join('');
+    $('codTit').textContent = 'Código: ' + (lang === 'cs' ? TIT[op].cs : TIT[op].o);
+    $('codLang').textContent = LING[lang].nome;
+    codAtual = chave;
+  }
+  const ds = $('cod').children;
+  for (let n = 0; n < ds.length; n++) ds[n].className = n === linha ? (erro ? 'at err' : 'at') : '';
+  const d = ds[linha];
+  if (d) { const p = $('cod'); const top = d.offsetTop - p.clientHeight / 2; p.scrollTo({ top: Math.max(0, top), behavior: 'smooth' }); }
+}
+function mostraFonte() {
+  const f = fonte(lang, conv);
+  $('full').innerHTML = f.split('\n').map((l, n) => `<div><span class="n">${n + 1}</span>${colore(l)}</div>`).join('');
+  $('fullTit').textContent = `Código completo (${NOMES_ARQ[lang]})`;
+  $('copiado').textContent = '';
+}
+
+/* ---------------- memória: pilha + árvore ---------------- */
+const R = 17, GX = 60, GY = 66;
+const SW = 272, FH = 50, FG = 8;
+// x pela ordem simétrica (as rotações não mudam a ordem); y pela profundidade.
+// Nós momentaneamente fora da árvore (durante uma rotação) ficam ao lado, na altura dos filhos.
+function layoutArv(s, ox, oy, dica) {
+  const seq = [], dep = new Map(), vis = new Set();
+  const f = (id, d) => { if (id == null || vis.has(id) || !s.nos[id]) return; vis.add(id); dep.set(id, d); f(s.nos[id].e, d + 1); seq.push(id); f(s.nos[id].d, d + 1); };
+  f(s.raiz, 0);
+  const soltos = Object.keys(s.nos).map(Number).filter(id => !vis.has(id));
+  let mud = true;
+  while (mud) {
+    mud = false;
+    for (const u of soltos) {
+      if (dep.has(u)) continue;
+      const n = s.nos[u], fs = [n.e, n.d].filter(q => q != null && dep.has(q));
+      if (fs.length) { dep.set(u, Math.min(...fs.map(q => dep.get(q))) - 1); mud = true; continue; }
+      for (const [id, q] of Object.entries(s.nos)) if (dep.has(+id) && (q.e === u || q.d === u)) { dep.set(u, dep.get(+id) + 1); mud = true; break; }
+    }
+  }
+  for (const u of soltos) if (!dep.has(u)) dep.set(u, dica != null && dep.has(dica) ? dep.get(dica) : 0);
+  for (const u of soltos) { const v = s.nos[u].v; let p = seq.findIndex(q => s.nos[q].v > v); if (p < 0) p = seq.length; seq.splice(p, 0, u); }
+  const min = Math.min(0, ...dep.values());
+  const pos = new Map();
+  seq.forEach((id, n) => pos.set(id, { x: ox + n * GX, y: oy + (dep.get(id) - min) * GY }));
+  return pos;
+}
+function geometria(p, vertical) {
+  const pilhaY0 = 74;
+  const pilhaH = pilhaY0 + Math.max(1, p.pilha.length) * (FH + FG) + 6;
+  let ox, oy;
+  if (vertical) { ox = 30; oy = pilhaH + 78; } else { ox = SW + 74; oy = 86; }
+  return { pilhaY0, pilhaH, ox, oy };
+}
+function desenha(p, t = 1) {
+  const s = p.snap, svg = $('svg');
+  const cw = svg.clientWidth || 600;
+  const vertical = cw < 560;
+  const g = geometria(p, vertical);
+  const topo = p.pilha[p.pilha.length - 1];
+  const dica = topo && topo.vars.find(v => v[0] === 'i' && v.length === 3);
+  const alvo = layoutArv(s, g.ox, g.oy, dica ? dica[2] : null);
+  const pos = new Map();
+  for (const [id, a] of alvo) { const o = posAnt.get(id); pos.set(id, o && t < 1 ? { x: o.x + (a.x - o.x) * t, y: o.y + (a.y - o.y) * t } : a); }
+  let W = vertical ? SW + 20 : SW + 120, H = g.pilhaH + 10;
+  for (const q of alvo.values()) { W = Math.max(W, q.x + 40); H = Math.max(H, q.y + 60); }
+  if (!alvo.size) { W = Math.max(W, vertical ? SW + 20 : SW + 330); H = Math.max(H, g.oy + 60); }
+  let esc_ = Math.min(1.3, cw / W);
+  const hAlvo = Math.max(340, Math.min(700, H * esc_ + 8));
+  if (Math.abs(svg.parentNode.clientHeight - hAlvo) > 2 && t >= 1) svg.parentNode.style.height = hAlvo + 'px';
+  esc_ = Math.min(esc_, (svg.parentNode.clientHeight || hAlvo) / H);
+  const vw = cw / esc_, vh = (svg.parentNode.clientHeight || hAlvo) / esc_;
+  svg.setAttribute('viewBox', `${-(vw - W) / 2} 0 ${vw} ${vh}`);
+  const css = getComputedStyle(document.documentElement);
+  const cor = v => css.getPropertyValue(v).trim();
+  const C = { lar: cor('--lar'), roxo: cor('--roxo'), verde: cor('--verde'), navy: cor('--navyink'), mute: cor('--mute'), ink: cor('--ink'), line: cor('--line'),
+    card: cor('--card'), larcl: cor('--larcl'), verdecl: cor('--verdecl'), no: cor('--no'), noborda: cor('--noborda'), verm: cor('--verm'), vermcl: cor('--vermcl'), gold: cor('--gold') };
+  const est = {
+    tn: [C.no, C.noborda, C.ink, 2.2], cam: [C.larcl, C.lar, C.ink, 2.2], novo: [C.lar, '#a85a12', '#fff', 2.2], achou: [C.verde, '#1d5535', '#fff', 2.2],
+    ok: [C.verdecl, C.verde, C.ink, 2.2], erro: [C.vermcl, C.verm, C.verm, 2.6], desb: [C.vermcl, C.verm, C.verm, 3.4], giro: [cor('--roxocl'), C.roxo, C.roxo, 3],
+    roxo: [cor('--roxocl'), C.roxo, C.roxo, 2.2]
+  };
+  const T = (x, y, txt, o = '') => `<text x="${x}" y="${y}" ${o}>${esc(txt)}</text>`;
+  const mono = 'font-family="JetBrains Mono,monospace"';
+  const pend = new Set(p.pend), nulos = $('nulos').checked, info = $('info').checked;
+  const L = LING[lang];
+  let fundo = '', arestas = '', nos = '', pilha = '', setas = '', extra = '';
+
+  fundo += T(10, 22, 'Pilha de execução (registros de ativação)', `font-size="12.5" font-weight="700" fill="${C.mute}"`);
+  fundo += T(vertical ? 10 : g.ox - 14, vertical ? g.oy - 40 : 22, lang === 'c' || lang === 'cpp' ? 'Heap: os nós da árvore (alocação dinâmica)' : 'Heap: os nós da árvore', `font-size="12.5" font-weight="700" fill="${C.mute}"`);
+  if (!vertical) fundo += `<line x1="${SW + 30}" y1="8" x2="${SW + 40}" y2="${Math.max(H, vh) - 8}" stroke="${C.line}" stroke-dasharray="4 5"/>`;
+
+  const stubs = {};
+  for (const [id, q] of pos) {
+    const no = s.nos[id];
+    for (const [lado, f, sx] of [['E', no.e, -1], ['D', no.d, 1]]) {
+      const recebe = (p.atrib && p.atrib.no === id && p.atrib.lado === lado);
+      if (f != null && pos.has(f)) {
+        const r = pos.get(f), ec = p.aresta[f] === 'cam';
+        const st = recebe ? `stroke="${C.verde}" stroke-width="4"` : `stroke="${ec ? C.lar : C.noborda}" stroke-width="${ec ? 3.5 : 1.8}"`;
+        // aresta que sobe (durante a rotação) é desenhada em arco para não cruzar o nó
+        const sobe = r.y < q.y - 1;
+        const d = sobe ? `M${q.x} ${q.y}Q${(q.x + r.x) / 2} ${Math.max(q.y, r.y) + 30} ${r.x} ${r.y}` : `M${q.x} ${q.y}L${r.x} ${r.y}`;
+        arestas += `<path d="${d}" fill="none" ${st} ${pend.has(f) || no.livre ? 'stroke-dasharray="5 5" opacity=".55"' : ''}/>`;
+      } else {
+        const cx = q.x + sx * 15, cy = q.y + 34; stubs[id + lado] = { x: cx, y: cy };
+        if (nulos) arestas += `<path d="M${q.x + sx * 8} ${q.y + 15}L${cx} ${cy}M${cx - 6} ${cy}h12M${cx - 3.5} ${cy + 3}h7" stroke="${C.mute}" stroke-width="1.2" fill="none" opacity=".7"/>`;
+      }
+    }
+  }
+  const H_ = id => id == null || !s.nos[id] ? -1 : s.nos[id].h;
+  for (const [id, q] of pos) {
+    const n = s.nos[id];
+    if (n.livre) {
+      nos += `<circle cx="${q.x}" cy="${q.y}" r="${R}" fill="${C.card}" stroke="${C.mute}" stroke-width="1.8" stroke-dasharray="4 3"/>` + T(q.x, q.y + 5, n.v, `text-anchor="middle" font-size="13" fill="${C.mute}" text-decoration="line-through"`);
+      nos += T(q.x, q.y + R + 14, 'liberado', `text-anchor="middle" font-size="11" fill="${C.mute}" font-style="italic"`);
+      continue;
+    }
+    const [f, b_, tx, sw] = est[p.marca[id]] || est.tn;
+    nos += `<circle cx="${q.x}" cy="${q.y}" r="${R}" fill="${f}" stroke="${b_}" stroke-width="${sw}"/>` + T(q.x, q.y + 5, n.v, `text-anchor="middle" font-weight="700" font-size="14" fill="${tx}"`);
+    if (info) {
+      const fb = (H_(n.e) - H_(n.d)) * (conv === 'de' ? -1 : 1), mau = Math.abs(fb) > 1;
+      const fc = mau ? C.verm : fb === 0 ? C.mute : C.navy;
+      const bx = q.x + 15, by = q.y - 15;
+      nos += `<rect x="${bx - 4}" y="${by - 9}" width="${fb === 0 ? 16 : 22}" height="16" rx="8" fill="${mau ? C.verm : C.card}" stroke="${fc}" stroke-width="1.3"/>` +
+        T(bx + (fb === 0 ? 4 : 7), by + 3.2, (fb > 0 ? '+' : '') + fb, `${mono} text-anchor="middle" font-size="10.5" font-weight="700" fill="${mau ? '#fff' : fc}"`);
+      nos += T(q.x - 21, q.y - 13, 'h' + n.h, `${mono} text-anchor="end" font-size="10.5" fill="${C.mute}"`);
+    }
+  }
+  if (p.rotacao) {
+    const alvoR = [...pos].find(([id]) => s.nos[id].v === p.rotacao.no && !s.nos[id].livre);
+    if (alvoR) {
+      const q = alvoR[1], txt = p.rotacao.nome.replace('rotação ', ''), w = txt.length * 6.6 + 16;
+      nos += `<rect x="${q.x - w / 2}" y="${q.y - R - 30}" width="${w}" height="19" rx="9.5" fill="${C.roxo}"/>` + T(q.x, q.y - R - 16.5, txt, `text-anchor="middle" font-size="12" font-weight="700" fill="#fff"`);
+    }
+  }
+  if (!alvo.size) nos += T(g.ox + 110, g.oy + 4, 'nenhum nó (árvore vazia)', `text-anchor="middle" fill="${C.mute}" font-size="14"`);
+
+  const curva = (x1, y1, alvoXY, rr, corr, largura, tracejada) => {
+    const { x, y } = alvoXY;
+    const c1x = vertical ? x1 + 40 : x1 + 70, c1y = y1;
+    const c2x = vertical ? x : x - 80, c2y = vertical ? y - 70 : y;
+    const ang = Math.atan2(y - c2y, x - c2x);
+    const ex = x - Math.cos(ang) * rr, ey = y - Math.sin(ang) * rr;
+    return `<path d="M${x1} ${y1}C${c1x} ${c1y} ${c2x} ${c2y} ${ex} ${ey}" fill="none" stroke="${corr}" stroke-width="${largura}" ${tracejada ? 'stroke-dasharray="5 4"' : ''} marker-end="url(#m${corr.replace('#', '')})"/>`;
+  };
+  const marcadores = new Set();
+  const celRef = (x, y, id, corr, ativa, ptrNulo) => {
+    let r = `<rect x="${x}" y="${y - 11}" width="26" height="22" rx="3" fill="${C.card}" stroke="${ativa ? corr : C.noborda}" stroke-width="${ativa ? 2 : 1.2}"/>`;
+    if (id == null || !pos.has(id)) {
+      r += `<line x1="${x + 3}" y1="${y + 8}" x2="${x + 23}" y2="${y - 8}" stroke="${C.verm}" stroke-width="1.6"/>`;
+      if (ativa && ptrNulo && stubs[ptrNulo[0] + ptrNulo[1]]) { marcadores.add(corr); setas += curva(x + 13, y, stubs[ptrNulo[0] + ptrNulo[1]], 4, corr, 1.6, true); }
+      return r;
+    }
+    marcadores.add(corr);
+    r += `<circle cx="${x + 13}" cy="${y}" r="3.2" fill="${corr}"/>`;
+    setas += curva(x + 13, y, pos.get(id), R + 2, corr, ativa ? 2.4 : 1.2, false);
+    return r;
+  };
+
+  // raiz (atributo do objeto / campo da struct)
+  const raizId = p.raiz === L.nul ? null : s.raiz;
+  const raizRecebe = p.atrib && p.atrib.raiz || p.ret && p.ret.para.raiz;
+  pilha += `<rect x="8" y="30" width="${SW - 8}" height="32" rx="5" fill="${raizRecebe ? C.verdecl : C.card}" stroke="${raizRecebe ? C.verde : C.line}"/>`;
+  pilha += T(16, 50, L.obj, `font-size="11.5" fill="${C.mute}"`);
+  pilha += T(SW - 52, 50, lang === 'c' ? 'raiz' : L.raiz, `${mono} font-size="12" text-anchor="end" fill="${C.ink}"`);
+  pilha += celRef(SW - 44, 46, raizId, raizRecebe ? C.verde : C.navy, true, null);
+
+  p.pilha.forEach((f, n) => {
+    const top = n === p.pilha.length - 1;
+    const y = g.pilhaY0 + n * (FH + FG);
+    pilha += `<rect x="8" y="${y}" width="${SW - 8}" height="${FH}" rx="5" fill="${top ? C.larcl : C.card}" stroke="${top ? C.lar : C.line}" stroke-width="${top ? 1.8 : 1}"/>`;
+    pilha += T(16, y + 16, f.nome, `${mono} font-size="11.5" fill="${top ? C.ink : C.mute}"`);
+    if (f.aguarda) pilha += T(SW - 8, y + 16, 'aguarda → ' + f.aguarda, `${mono} font-size="10.5" text-anchor="end" fill="${C.verde}" font-weight="600"`);
+    let x = 16;
+    for (const v of f.vars) {
+      pilha += T(x, y + 39, v[0], `${mono} font-size="12.5" fill="${C.ink}"`);
+      x += v[0].length * 8 + 6;
+      if (v.length === 3) {
+        const corr = v[0] === 'j' ? C.roxo : v[0] === 'i' ? C.lar : C.navy;
+        const ptrNulo = top && p.ptr && p.ptr[v[0]] && p.ptr[v[0]].nulo;
+        pilha += celRef(x, y + 34, v[2], top ? corr : C.noborda, top, ptrNulo);
+        x += 40;
+      } else {
+        const w = Math.max(30, String(v[1]).length * 8 + 12);
+        pilha += `<rect x="${x}" y="${y + 23}" width="${w}" height="22" rx="3" fill="${C.card}" stroke="${C.noborda}"/>` + T(x + w / 2, y + 39, v[1], `${mono} font-size="12.5" text-anchor="middle" fill="${C.ink}"`);
+        x += w + 14;
+      }
+    }
+  });
+  if (!p.pilha.length) pilha += T(16, g.pilhaY0 + 22, 'nenhuma chamada em andamento', `font-size="12.5" fill="${C.mute}"`);
+
+  const rotLado = lado => lado === 'E' ? (lang === 'cs' ? 'Esq' : 'esq') : (lang === 'cs' ? 'Dir' : 'dir');
+  if (p.ret) {
+    const para = p.ret.para;
+    let dx, dy;
+    if (para.raiz) { dx = SW - 31; dy = 46; }
+    else if (pos.has(para.no)) {
+      const q = pos.get(para.no), sx = para.lado === 'E' ? -1 : 1;
+      dx = q.x + sx * 33; dy = q.y + 30;
+      extra += `<rect x="${dx - 17}" y="${dy - 10}" width="34" height="20" rx="10" fill="${C.verdecl}" stroke="${C.verde}" stroke-width="1.6"/>` + T(dx, dy + 4.5, rotLado(para.lado), `${mono} font-size="11.5" text-anchor="middle" font-weight="700" fill="${C.verde}"`);
+    }
+    if (dx != null) {
+      marcadores.add(C.verde);
+      if (p.ret.de != null && pos.has(p.ret.de)) {
+        const q = pos.get(p.ret.de);
+        const mx = (q.x + dx) / 2 + (para.raiz ? 0 : 40), my = Math.min(q.y, dy) - 40;
+        extra += `<path d="M${q.x} ${q.y - R}Q${mx} ${my} ${dx} ${dy - 11}" fill="none" stroke="${C.verde}" stroke-width="2.6" stroke-dasharray="7 4" marker-end="url(#m${C.verde.replace('#', '')})"/>`;
+        extra += T(mx, my + 8, 'devolve n(' + s.nos[p.ret.de].v + ')', `${mono} font-size="11.5" text-anchor="middle" font-weight="700" fill="${C.verde}" paint-order="stroke" stroke="${C.card}" stroke-width="4"`);
+      } else {
+        extra += T(dx, dy - 16, 'recebe ' + L.nul, `${mono} font-size="11.5" text-anchor="middle" font-weight="700" fill="${C.verde}" paint-order="stroke" stroke="${C.card}" stroke-width="4"`);
+      }
+    }
+  }
+  if (p.atrib && !p.atrib.raiz && pos.has(p.atrib.no)) {
+    const q = pos.get(p.atrib.no), sx = p.atrib.lado === 'E' ? -1 : 1, dx = q.x + sx * 33, dy = q.y + 30;
+    extra += `<rect x="${dx - 17}" y="${dy - 10}" width="34" height="20" rx="10" fill="${C.verde}"/>` + T(dx, dy + 4.5, rotLado(p.atrib.lado), `${mono} font-size="11.5" text-anchor="middle" font-weight="700" fill="#fff"`);
+  }
+
+  const mk = c => `<marker id="m${c.replace('#', '')}" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="${c}"/></marker>`;
+  [C.lar, C.roxo, C.verde, C.navy, C.noborda].forEach(c => marcadores.add(c));
+  svg.innerHTML = `<defs>${[...marcadores].map(mk).join('')}</defs><g font-family="Source Sans 3,sans-serif">${fundo}${arestas}${setas}${nos}${pilha}${extra}</g>`;
+  if (t >= 1) posAnt = alvo;
+}
+function animaPara(p) {
+  cancelAnimationFrame(anim);
+  const reduz = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (reduz || posAnt.size === 0) { desenha(p, 1); return; }
+  const t0 = performance.now(), dur = 420;
+  const f = now => { const t = Math.min(1, (now - t0) / dur); desenha(p, t < 1 ? 1 - (1 - t) ** 3 : 1); if (t < 1) anim = requestAnimationFrame(f); };
+  anim = requestAnimationFrame(f);
+}
+
+/* ---------------- painel ---------------- */
+function mostra() {
+  const p = passos[k];
+  if (!p) return;
+  mostraCodigo(p.op, p.linha, p.erro);
+  animaPara(p);
+  $('nota').innerHTML = p.nota;
+  const rt = p.rotacao;
+  $('rot').hidden = !rt;
+  if (rt) $('rot').innerHTML = `<h3>${cap(rt.nome)} em <code>n(${rt.no})</code>${rt.etapa && rt.etapa !== 'decisão' ? `<span class="et">${esc(rt.etapa)}</span>` : ''}</h3><p><b>Por quê?</b> ${rt.motivo}</p>`;
+  $('nota').className = 'nota' + (p.erro ? ' err' : '');
+  $('res').innerHTML = p.resultado !== undefined && k === passos.length - 1 ? `Resultado: <b>${esc(p.resultado)}</b>` : '';
+  $('pBar').max = passos.length - 1; $('pBar').value = k;
+  $('pCont').textContent = `${k + 1}/${passos.length}`;
+  const ids = Object.keys(p.snap.nos).filter(id => !p.snap.nos[id].livre);
+  const alt = id => id == null || !p.snap.nos[id] ? -1 : 1 + Math.max(alt(p.snap.nos[id].e), alt(p.snap.nos[id].d));
+  $('info2').textContent = `${ids.length} nó${ids.length === 1 ? '' : 's'}` + (k === passos.length - 1 && ids.length ? ` · altura ${alt(p.snap.raiz)}` : '');
+  $('pAnt').disabled = $('pIni').disabled = k === 0;
+  $('pPro').disabled = $('pFim').disabled = k === passos.length - 1;
+  rotulo();
+}
+const manual = () => $('modo').value === 'manual';
+function rotulo() { $('pPlay').textContent = manual() ? '▶ Executar passo' : timer ? '⏸ Pausar' : '▶ Executar'; $('pPlay').disabled = manual() && k >= passos.length - 1; $('vel').disabled = manual(); }
+function para() { clearInterval(timer); timer = null; rotulo(); }
+function toca() {
+  if (k >= passos.length - 1) k = 0;
+  timer = setInterval(() => { if (k < passos.length - 1) { k++; mostra(); } else para(); }, +$('vel').value);
+  rotulo();
+}
+function carrega(ps, rot, erro, inicio) {
+  para(); passos = ps; k = inicio != null ? inicio : $('passo').checked ? 0 : ps.length - 1; mostra();
+  if (rot) log(rot, erro);
+  if (inicio == null && $('passo').checked && ps.length > 1 && !manual()) toca();
+}
+function log(t, e) { const s = document.createElement('span'); s.textContent = t; if (e) s.className = 'e'; $('log').prepend(s); while ($('log').children.length > 14) $('log').lastChild.remove(); }
+function estado(nota) {
+  ultima = null;
+  const p = { op: codAtual ? codAtual.split('|')[2] || 'ins' : 'ins', linha: -1, nota, ptr: {}, snap: m.snap(), marca: {}, aresta: {}, pend: [], pilha: [], raiz: m.raiz == null ? LING[lang].nul : `n(${m.nos.get(m.raiz).v})` };
+  if (!['ins', 'rem', 'pes'].includes(p.op)) p.op = 'ins';
+  para(); passos = [p]; k = 0; mostra();
+}
+function valores() {
+  const v = $('val').value.trim().split(/[\s,;]+/).filter(Boolean).map(Number);
+  if (!v.length || v.some(x => !Number.isInteger(x) || Math.abs(x) > 999)) { estado('Digite números <b>inteiros</b> entre −999 e 999.'); return null; }
+  return v;
+}
+
+/* ---------------- operações ---------------- */
+const NOME = { ins: 'inserir', rem: 'remover', pes: 'pesquisar' };
+function gera(tipo, x) { return tipo === 'ins' ? traceInserir(m, x, lang, conv) : tipo === 'rem' ? traceRemover(m, x, lang, conv) : tracePesquisar(m, x, lang, conv); }
+function op(tipo, inicio) {
+  const v = valores(); if (!v) return;
+  if (v.length > 1) {
+    if (tipo !== 'ins') { estado('Remoção e pesquisa são feitas com <b>um</b> valor por vez.'); return; }
+    const ok = [], rep = [];
+    for (const x of v) { try { m.inserir(x); ok.push(x); } catch { rep.push(x); } }
+    estado(`Inseridos de uma vez, com os balanceamentos já feitos: <b>${ok.join(', ') || 'nenhum'}</b>` + (rep.length ? `. Já existiam (ignorados): ${rep.join(', ')}` : '') + '.');
+    log('Inserir ' + ok.join(' '), false); return;
+  }
+  const x = v[0];
+  const antes = m.snap();
+  const ps = gera(tipo, x);
+  ultima = { tipo, x, antes };
+  const fim = ps.at(-1);
+  const nome = lang === 'cs' ? cap(NOME[tipo]) : NOME[tipo];
+  carrega(ps, `${nome}(${x})` + (fim.erro ? ' ✗' : tipo === 'pes' ? ' = ' + fim.resultado : '') + (fim.rotacoes && fim.rotacoes.length ? ' · ' + fim.rotacoes.join('; ') : ''), fim.erro, inicio);
+}
+function novaArvore(seq, nome) { m.limpa(); posAnt = new Map(); for (const x of seq) m.inserir(x); estado(nome); log('Nova árvore', false); }
+const CASOS = {
+  LL: { seq: [50, 30, 70, 20, 40], op: 'ins', x: 10, txt: 'A inserção do 10 deixa o 50 pendendo para a esquerda (|fb| = 2), e o filho esquerdo (30) pende para o mesmo lado: rotação simples à direita.' },
+  RR: { seq: [50, 30, 70, 60, 80], op: 'ins', x: 90, txt: 'A inserção do 90 deixa o 50 pendendo para a direita (|fb| = 2), e o filho direito (70) pende para o mesmo lado: rotação simples à esquerda.' },
+  LR: { seq: [50, 30, 70, 20, 40], op: 'ins', x: 45, txt: 'A inserção do 45 deixa o 50 pendendo para a esquerda, mas o filho esquerdo (30) pende para a direita: rotação dupla à direita (simples à esquerda no 30, depois simples à direita no 50).' },
+  RL: { seq: [50, 30, 70, 60, 80], op: 'ins', x: 55, txt: 'A inserção do 55 deixa o 50 pendendo para a direita, mas o filho direito (70) pende para a esquerda: rotação dupla à esquerda (simples à direita no 70, depois simples à esquerda no 50).' },
+  REM: { seq: [50, 30, 70, 20, 40, 80, 10], op: 'rem', x: 80, txt: 'Remover o 80 encurta a subárvore direita do 50, que passa a pender para a esquerda (|fb| = 2): a remoção também pode exigir rotação.' },
+  REM2: { seq: [50, 30, 70, 20, 40, 60, 80, 35, 45], op: 'rem', x: 50, txt: 'O 50 tem dois filhos: o antecessor (o maior da subárvore esquerda) toma o lugar dele, e na volta cada nó do caminho é balanceado.' },
+  SEQ: { seq: [1, 2, 3, 4, 5, 6], op: 'ins', x: 7, txt: 'Os valores 1 a 6 foram inseridos em ordem crescente. Numa ABP comum isso formaria uma lista; a AVL se mantém baixa. Veja a inserção do 7.' }
+};
+function caso(id) {
+  const cz = CASOS[id]; if (!cz) return;
+  m.limpa(); posAnt = new Map(); for (const x of cz.seq) m.inserir(x);
+  $('val').value = cz.x;
+  log('Caso: árvore ' + cz.seq.join(' '), false);
+  op(cz.op, 0);
+  $('nota').innerHTML = cz.txt + ' Clique em <b>Executar</b>.';
+}
+
+function dicaFb() { $('dicafb').innerHTML = `Fator de balanceamento: <code>fb = ${conv === 'de' ? 'altura(dir) − altura(esq)' : 'altura(esq) − altura(dir)'}</code>: positivo pende para a ${conv === 'de' ? 'direita' : 'esquerda'}, negativo para a ${conv === 'de' ? 'esquerda' : 'direita'}.`; }
+$('conv').value = conv; dicaFb();
+$('conv').onchange = () => { conv = $('conv').value; guarda('avlFb', conv); dicaFb(); refaz(); };
+document.querySelectorAll('#langs button').forEach(bt => bt.onclick = () => {
+  lang = bt.dataset.l; guarda('avlLang', lang);
+  document.querySelectorAll('#langs button').forEach(q => q.setAttribute('aria-pressed', q.dataset.l === lang));
+  refaz();
+});
+function refaz() {
+  mostraFonte();
+  if (ultima) {
+    const fimAntes = k === passos.length - 1;
+    m.restaura(ultima.antes);
+    const ps = gera(ultima.tipo, ultima.x);
+    ultima = { ...ultima };
+    para(); passos = ps; k = fimAntes ? ps.length - 1 : 0; mostra();
+  } else { const op0 = codAtual ? codAtual.split('|')[2] : 'ins'; codAtual = 'x||' + op0; estado($('nota').innerHTML); }
+}
+document.querySelectorAll('#langs button').forEach(q => q.setAttribute('aria-pressed', q.dataset.l === lang));
+$('bIns').onclick = () => op('ins'); $('bPes').onclick = () => op('pes'); $('bRem').onclick = () => op('rem');
+$('caso').onchange = () => { caso($('caso').value); $('caso').value = ''; };
+$('bEx').onclick = () => novaArvore([50, 30, 70, 20, 40, 60, 80, 10], 'Árvore de exemplo: 50, 30, 70, 20, 40, 60, 80 e 10. Experimente inserir 5.');
+$('bAle').onclick = () => { const s = new Set(); while (s.size < 10) s.add(1 + Math.floor(Math.random() * 99)); const a = [...s]; novaArvore(a, 'Árvore aleatória: inseridos ' + a.join(', ') + ' (com os balanceamentos já feitos).'); };
+$('bLim').onclick = () => novaArvore([], 'Árvore vazia. Insira um valor para começar.');
+$('val').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); op('ins'); } });
+$('pPlay').onclick = () => { if (manual()) { if (k < passos.length - 1) { k++; mostra(); } } else timer ? para() : toca(); };
+$('modo').onchange = () => { para(); guarda('avlModo', $('modo').value); };
+{ const mm = le('avlModo'); if (mm === 'manual' || mm === 'auto') $('modo').value = mm; }
+$('pAnt').onclick = () => { para(); if (k > 0) { k--; mostra(); } };
+$('pPro').onclick = () => { para(); if (k < passos.length - 1) { k++; mostra(); } };
+$('pIni').onclick = () => { para(); k = 0; mostra(); };
+$('pFim').onclick = () => { para(); k = passos.length - 1; mostra(); };
+$('pBar').oninput = e => { para(); k = +e.target.value; mostra(); };
+$('vel').onchange = () => { if (timer) { para(); toca(); } };
+$('nulos').onchange = $('info').onchange = () => desenha(passos[k], 1);
+document.addEventListener('keydown', e => {
+  if (e.target.tagName === 'INPUT' && e.target.type === 'text') return;
+  if (e.key === 'ArrowRight') { e.preventDefault(); $('pPro').click(); }
+  else if (e.key === 'ArrowLeft') { e.preventDefault(); $('pAnt').click(); }
+  else if (e.key === ' ' && e.target.tagName !== 'BUTTON' && e.target.tagName !== 'SELECT') { e.preventDefault(); $('pPlay').click(); }
+});
+const rede = () => passos[k] && desenha(passos[k], 1);
+{ let lw = -1; new ResizeObserver(en => { const w = Math.round(en[0].contentRect.width); if (w === lw) return; lw = w; requestAnimationFrame(() => { rede(); }); }).observe($('svg')); }
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', rede);
+new MutationObserver(rede).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+
+$('bCopia').onclick = async () => { try { await navigator.clipboard.writeText(fonte(lang)); $('copiado').textContent = 'Copiado.'; } catch { $('copiado').textContent = 'Não foi possível copiar; selecione o texto abaixo.'; } };
+mostraFonte();
+
+// começa com a árvore de exemplo e a inserção do 5 pronta para executar (rotação simples à direita no 20)
+for (const x of [50, 30, 70, 20, 40, 60, 80, 10]) m.inserir(x);
+op('ins', 0);
+}
+
+</script>
+</body>
+</html>
