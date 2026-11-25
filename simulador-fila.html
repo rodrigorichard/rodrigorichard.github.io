@@ -104,7 +104,7 @@ svg .nova{animation:nova .6s ease-out}
 @keyframes muda{0%{stroke:var(--lar);stroke-width:5}100%{stroke:var(--noborda);stroke-width:1.4}}
 @keyframes nova{0%{opacity:0;transform:translateY(-8px)}100%{opacity:1;transform:none}}
 /* player */
-.player{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:14px;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:8px 12px}
+.player{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px;position:sticky;top:0;z-index:5;box-shadow:0 4px 14px rgba(11,45,91,.12);background:var(--card);border:1px solid var(--line);border-radius:10px;padding:8px 12px}
 .player input[type=range]{flex:1 1 200px;accent-color:var(--navy);min-height:40px}
 .cont{font:14px var(--f-mono);color:var(--mute);white-space:nowrap}
 .chk{display:flex;gap:6px;align-items:center;font-size:15px}
@@ -118,6 +118,7 @@ svg .nova{animation:nova .6s ease-out}
 .leg i.esp{height:13px;width:15px;background:var(--no);border-left:4px solid var(--noborda)}
 .leg i.at{height:13px;width:15px;background:var(--larcl);border-left:4px solid var(--lar)}
 footer{max-width:1500px;margin:auto;padding:0 max(3vw,14px) 28px;color:var(--mute);font-size:14px}
+@media(max-width:600px){.player{position:static}}
 @media(max-width:900px){.palco{grid-template-columns:minmax(0,1fr)}#codFila{max-height:280px}}
 @media(prefers-reduced-motion:reduce){svg .muda,svg .nova{animation:none}}
 </style>
@@ -133,6 +134,23 @@ footer{max-width:1500px;margin:auto;padding:0 max(3vw,14px) 28px;color:var(--mut
     <div id="chips" style="display:contents"></div>
   </div>
   <p class="dica">À esquerda, a linha em execução no <code>Main</code> (em azul, quando está esperando um método terminar) e no método da <code>CFila</code>. À direita, a memória: as variáveis na pilha de execução e os objetos no heap. Use <kbd>←</kbd> e <kbd>→</kbd> para voltar e avançar.</p>
+
+  <div class="player" role="group" aria-label="Controle dos passos">
+    <button id="pIni" type="button" title="Primeiro passo" aria-label="Primeiro passo">⏮</button>
+    <button id="pAnt" type="button" title="Passo anterior (←)" aria-label="Passo anterior">◀</button>
+    <button id="pPlay" type="button" class="pri" title="Executar / pausar" aria-label="Executar ou pausar" style="min-width:150px">▶ Executar</button>
+    <button id="pPro" type="button" title="Próximo passo (→)" aria-label="Próximo passo">▶|</button>
+    <button id="pFim" type="button" title="Último passo" aria-label="Último passo">⏭</button>
+    <input type="range" id="barra" min="0" value="0" aria-label="Passo da execução">
+    <span class="cont" id="contador" aria-live="polite"></span>
+    <select id="modo" aria-label="Modo de execução">
+      <option value="auto">Execução automática</option><option value="manual">Um passo por clique</option>
+    </select>
+    <select id="vel" aria-label="Velocidade">
+      <option value="3200">0,5×</option><option value="1700" selected>1×</option><option value="900">2×</option><option value="450">4×</option>
+    </select>
+    <label class="chk"><input type="checkbox" id="enderecos" checked> mostrar endereços</label>
+  </div>
 
   <div class="palco">
     <section class="card" aria-label="Código em execução">
@@ -155,22 +173,6 @@ footer{max-width:1500px;margin:auto;padding:0 max(3vw,14px) 28px;color:var(--mut
     </section>
   </div>
 
-  <div class="player" role="group" aria-label="Controle dos passos">
-    <button id="pIni" type="button" title="Primeiro passo" aria-label="Primeiro passo">⏮</button>
-    <button id="pAnt" type="button" title="Passo anterior (←)" aria-label="Passo anterior">◀</button>
-    <button id="pPlay" type="button" class="pri" title="Executar / pausar" aria-label="Executar ou pausar" style="min-width:150px">▶ Executar</button>
-    <button id="pPro" type="button" title="Próximo passo (→)" aria-label="Próximo passo">▶|</button>
-    <button id="pFim" type="button" title="Último passo" aria-label="Último passo">⏭</button>
-    <input type="range" id="barra" min="0" value="0" aria-label="Passo da execução">
-    <span class="cont" id="contador" aria-live="polite"></span>
-    <select id="modo" aria-label="Modo de execução">
-      <option value="auto">Execução automática</option><option value="manual">Um passo por clique</option>
-    </select>
-    <select id="vel" aria-label="Velocidade">
-      <option value="3200">0,5×</option><option value="1700" selected>1×</option><option value="900">2×</option><option value="450">4×</option>
-    </select>
-    <label class="chk"><input type="checkbox" id="enderecos"> mostrar endereços</label>
-  </div>
   <div class="leg">
     <span><i></i>referência</span>
     <span><i class="this"></i><code>this</code></span>
@@ -456,7 +458,7 @@ footer{max-width:1500px;margin:auto;padding:0 max(3vw,14px) 28px;color:var(--mut
   // ------------------------------------------------------------------ desenho da memória
   const NS = "http://www.w3.org/2000/svg";
   const svg = document.getElementById("mem");
-  let mostrarEnd = false;
+  let mostrarEnd = document.getElementById("enderecos").checked;
 
   function chaves(p) {
     const m = {};

@@ -63,7 +63,7 @@ pre.cod .n{display:inline-block;width:2.2em;color:var(--mute);opacity:.6;user-se
 .telab{padding:4px 12px 12px}
 .tela{background:#111b27;color:#7ee2a0;font:15px "JetBrains Mono",monospace;padding:8px 10px;border-radius:6px;min-height:40px;overflow-wrap:anywhere}
 .res{margin-top:8px;font-size:15px}
-.player{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:14px;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:8px 12px}
+.player{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px;position:sticky;top:0;z-index:5;box-shadow:0 4px 14px rgba(11,45,91,.12);background:var(--card);border:1px solid var(--line);border-radius:10px;padding:8px 12px}
 .player input[type=range]{flex:1 1 200px;accent-color:var(--navy);min-height:40px}
 .cont{font:14px "JetBrains Mono",monospace;color:var(--mute);white-space:nowrap}
 .chk{display:flex;gap:6px;align-items:center;font-size:15px}
@@ -78,13 +78,14 @@ details pre{margin:0;max-height:none;border-top:1px solid var(--line)}
 .leg b{display:inline-block;width:14px;height:14px;border-radius:50%;vertical-align:-2px;margin-right:4px;border:2px solid}
 @media(max-width:900px){.palco{grid-template-columns:minmax(0,1fr)}.cardcod{order:2}pre.cod{max-height:340px}}
 @media(max-width:600px){.grp+.grp{border-left:0;padding-left:0}pre.cod{font-size:12.5px}}
+@media(max-width:600px){.player{position:static}}
 @media(prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 </head>
 <body>
 <header>
   <h1>Simulador de Árvore Binária de Pesquisa</h1>
-  <p>Algoritmos e Estruturas de Dados · PUC Minas · o teste de mesa da classe <code>ArvoreBinaria</code> em C#, linha a linha</p>
+  <p>Algoritmos e Estruturas de Dados · PUC Minas · o teste de mesa da classe <code>ArvoreBinaria</code> em C#, linha a linha · <a href="index.html" style="color:#fff">todos os simuladores</a></p>
 </header>
 <main>
   <div class="ops" role="group" aria-label="Operações">
@@ -112,19 +113,6 @@ details pre{margin:0;max-height:none;border-top:1px solid var(--line)}
   </div>
   <p id="dicaval" class="leg" style="margin:6px 2px 0">Digite um número inteiro. Vários números separados por espaço ou vírgula (ex.: 50 30 70) são inseridos de uma vez, sem passo a passo.</p>
 
-  <div class="palco">
-    <section class="card cardcod" aria-label="Código em execução">
-      <div class="tit"><span id="codTit">Código</span><small>classe ArvoreBinaria</small></div>
-      <pre class="cod" id="cod"></pre>
-    </section>
-    <section class="card" aria-label="Árvore e memória">
-      <div class="tit"><span>Memória: pilha de execução e árvore</span><small id="info"></small></div>
-      <div class="fig"><svg id="svg" role="img" aria-label="Pilha de execução e árvore na memória"></svg></div>
-      <div class="nota" id="nota" aria-live="polite"></div>
-      <div class="telab"><h3>Tela</h3><div class="tela" id="tela"></div><div class="res" id="res"></div></div>
-    </section>
-  </div>
-
   <div class="player" role="group" aria-label="Controle dos passos">
     <button id="pIni" title="Primeiro passo" aria-label="Primeiro passo">⏮</button>
     <button id="pAnt" title="Passo anterior (←)" aria-label="Passo anterior">◀</button>
@@ -142,6 +130,20 @@ details pre{margin:0;max-height:none;border-top:1px solid var(--line)}
     <label class="chk"><input type="checkbox" id="passo" checked> passo a passo</label>
     <label class="chk"><input type="checkbox" id="nulos" checked> mostrar null</label>
   </div>
+
+  <div class="palco">
+    <section class="card cardcod" aria-label="Código em execução">
+      <div class="tit"><span id="codTit">Código</span><small>classe ArvoreBinaria</small></div>
+      <pre class="cod" id="cod"></pre>
+    </section>
+    <section class="card" aria-label="Árvore e memória">
+      <div class="tit"><span>Memória: pilha de execução e árvore</span><small id="info"></small></div>
+      <div class="fig"><svg id="svg" role="img" aria-label="Pilha de execução e árvore na memória"></svg></div>
+      <div class="nota" id="nota" aria-live="polite"></div>
+      <div class="telab"><h3>Tela</h3><div class="tela" id="tela"></div><div class="res" id="res"></div></div>
+    </section>
+  </div>
+
   <div class="leg">
     <span><b style="background:var(--larcl);border-color:var(--lar)"></b>caminho percorrido</span>
     <span><b style="background:var(--lar);border-color:var(--lar)"></b>nó novo</span>
