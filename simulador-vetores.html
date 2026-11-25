@@ -1,0 +1,1591 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Simulador de Vetores e Matrizes</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500;600&display=swap">
+<style>
+/* VOICE: instrumento de bancada, claro e didático, para projetar em sala de aula (irmão do simulador de memória e CPU).
+   IDEA: o vetor desenhado duas vezes — como o aluno pensa (caixas com índices) e como a máquina guarda (bytes na pilha e no heap).
+   PICTURE: caixas do vetor com i e j percorrendo, ligadas por cor aos bytes; setas de referência da pilha ao heap.
+   COLOUR and TYPE: alumínio #e9eaec, preto, ponteiro laranja #ff4f00; noite #141517. Geist + Geist Mono.
+   LAYOUT: escolhas no topo; código | CPU | visão lógica; pilha | heap; controles fixos embaixo. */
+:root{color-scheme:light dark;--bg:light-dark(#e9eaec,#141517);--pan:light-dark(#f7f7f8,#1c1e21);--ink:light-dark(#111214,#ececee);--mute:light-dark(#62666d,#9da1a8);--line:light-dark(#cdd0d4,#30333a);--acc:#ff4f00;--accs:light-dark(#ffe6da,#43210f);--code:light-dark(#ffffff,#17181a);--bad:light-dark(#c4271f,#ff7b72);--blue:light-dark(#1f5fd6,#7aa7ff)}
+:root[data-theme=light]{color-scheme:light}:root[data-theme=dark]{color-scheme:dark}
+*{box-sizing:border-box;min-width:0}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 Geist,system-ui,sans-serif;overflow-x:clip;position:relative}
+code,pre{font-family:"Geist Mono",ui-monospace,Menlo,Consolas,monospace}
+button,select{font:inherit;color:inherit}
+:focus-visible{outline:3px solid var(--acc);outline-offset:2px}
+.top{display:flex;flex-wrap:wrap;gap:14px 28px;align-items:end;justify-content:space-between;padding:18px max(3vw,16px) 14px}
+h1{font-size:32px;line-height:1.05;margin:0;font-weight:600;letter-spacing:-.01em;text-wrap:balance}
+.top p{margin:6px 0 0;color:var(--mute);max-width:62ch}
+.tools{display:flex;flex-wrap:wrap;gap:10px 14px;align-items:end}
+.fld{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--mute)}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--pan)}
+.seg button{min-height:42px;padding:0 13px;border:0;border-right:1px solid var(--line);background:none;cursor:pointer;font-weight:500}
+.seg button:last-child{border-right:0}
+.seg button[aria-pressed=true]{background:var(--ink);color:var(--bg)}
+.seg button code{font-size:14px}
+select{min-height:42px;border:1px solid var(--line);border-radius:10px;background:var(--pan);padding:0 10px;font-size:16px;max-width:290px}
+.btn{min-height:42px;border:1px solid var(--line);border-radius:10px;background:var(--pan);padding:0 16px;cursor:pointer;font-weight:500}
+.btn.pri{background:var(--acc);border-color:var(--acc);color:#fff}
+.hid{display:none!important}
+main{display:grid;gap:14px;padding:0 max(3vw,16px) 110px;grid-template-columns:minmax(0,1fr);align-items:start}
+@media(min-width:860px){main{grid-template-columns:minmax(0,1.1fr) minmax(0,.9fr)}#visP{grid-column:1/-1}}
+@media(min-width:860px){main.jl #stackP,main.jl #heapP{grid-column:1/-1}}
+@media(min-width:1360px){main{grid-template-columns:minmax(0,.95fr) minmax(0,.62fr) minmax(0,1.15fr)}#visP{grid-column:auto}#stackP{grid-column:1/3}main.jl #stackP{grid-column:1/2}main.jl #heapP{grid-column:2/4}}
+.pan{background:var(--pan);border:1px solid var(--line);border-radius:14px;padding:14px}
+.pan h2{font-size:14px;font-weight:600;margin:0 0 10px;display:flex;justify-content:space-between;gap:8px;align-items:baseline;flex-wrap:wrap}
+.pan h2 small{font-weight:400;color:var(--mute);font-size:13px}
+.col{display:flex;flex-direction:column;gap:14px}
+#code{background:var(--code);border:1px solid var(--line);border-radius:10px;padding:8px 0;font:14px/1.6 "Geist Mono",monospace;max-height:58vh;overflow:auto}
+.cl{display:flex;white-space:pre;padding-right:12px;border-left:4px solid transparent}
+.cl .ln{width:3em;flex:none;text-align:right;padding-right:12px;color:var(--mute);user-select:none;opacity:.7}
+.cl.cur{background:var(--accs);border-left-color:var(--acc)}
+.cl.cur .ln{color:var(--acc);opacity:1;font-weight:600}
+.cl.err{background:light-dark(#fde3e1,#3b1513);text-decoration:underline wavy var(--bad);text-underline-offset:4px}
+.t-ty{color:light-dark(#0b5cd5,#79b8ff)}.t-kw{color:light-dark(#a3207a,#f08ad0)}.t-st{color:light-dark(#18794e,#7ee2a8)}
+.t-nu{color:light-dark(#b45309,#ffb169)}.t-cm{color:var(--mute);font-style:italic}.t-pp{color:light-dark(#0e7490,#5ccfe6)}.t-fn{color:light-dark(#5b3fc4,#b9a6ff)}
+#explain{min-height:120px}
+#explain .ttl{font-weight:600;margin-bottom:4px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+#explain p{margin:0;max-width:72ch}
+#explain code{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:0 4px;font-size:14px}
+.tag{font-size:13px;font-weight:500;border-radius:6px;padding:1px 8px;background:var(--ink);color:var(--bg)}
+.msgs{display:flex;flex-direction:column;gap:8px;margin-top:10px}
+.msg{border-radius:10px;padding:10px 12px;font-size:14.5px;border:1px solid}
+.msg pre{margin:6px 0 0;white-space:pre-wrap;font-size:13px}
+.msg.e{border-color:var(--bad);background:light-dark(#fdecea,#2e1412)}
+.msg.w{border-color:#d08700;background:light-dark(#fff6dc,#2c230d)}
+#cpu{display:flex;flex-direction:column;gap:12px}
+.regs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.reg{border:1px solid var(--line);border-radius:10px;padding:6px 10px;background:var(--code);min-height:56px}
+.reg .rn{display:flex;justify-content:space-between;font-size:13px;color:var(--mute);gap:6px}
+.reg .rn b{color:var(--ink)}
+.reg .rv{font:500 15px/1.3 "Geist Mono",monospace;overflow-wrap:anywhere}
+.reg.empty .rv{color:var(--mute)}
+#alu{display:grid;grid-template-columns:88px minmax(0,1fr);gap:12px;align-items:center}
+.alu-shape{height:70px;background:var(--ink);color:var(--bg);clip-path:polygon(0 0,38% 0,50% 22%,62% 0,100% 0,78% 100%,22% 100%);display:grid;place-items:end center;padding-bottom:10px;font-weight:600;font-size:15px}
+.alu-txt{font:500 14.5px/1.4 "Geist Mono",monospace;overflow-wrap:anywhere}
+.alu-txt small{display:block;font-family:Geist,sans-serif;color:var(--mute);font-size:13px}
+.ir{border-top:1px dashed var(--line);padding-top:10px;font-size:13px;color:var(--mute)}
+.ir code{display:block;color:var(--ink);font-size:14px;white-space:pre-wrap;margin:2px 0 6px}
+.ir code.nx{color:var(--mute)}
+#out{background:#0f1011;color:#e8e8e8;border-radius:10px;padding:12px;min-height:90px;max-height:220px;overflow:auto;font:14.5px/1.5 "Geist Mono",monospace;white-space:pre-wrap;margin:0}
+#out .cur{display:inline-block;width:.6em;height:1.1em;background:var(--acc);vertical-align:text-bottom;animation:bl 1s steps(1) infinite}
+@keyframes bl{50%{opacity:0}}
+/* visão lógica */
+.lv{margin-bottom:22px;overflow-x:auto;padding-bottom:4px}
+.lvh{display:flex;gap:8px;align-items:baseline;margin-bottom:6px;flex-wrap:wrap}
+.lvh b{font:600 17px "Geist Mono",monospace;color:var(--c)}
+.lvh span{font-size:13px;color:var(--mute)}
+.lg{display:grid;gap:4px 4px;align-items:end;width:max-content}
+.lc{height:46px;min-width:50px;border:2px solid var(--c);border-radius:8px;display:grid;place-items:center;font:500 16px "Geist Mono",monospace;background:color-mix(in srgb,var(--t,transparent) 20%,var(--code));padding:0 4px;transition:background .2s}
+.lc.junk{color:var(--bad);font-size:13px}
+.lc.acc-r{box-shadow:0 0 0 3px var(--blue);background:color-mix(in srgb,var(--blue) 18%,var(--code))}
+.lc.acc-w{background:var(--acc);color:#fff;border-color:var(--acc)}
+.li{text-align:center;font:13px "Geist Mono",monospace;color:var(--mute)}
+.mks{display:flex;flex-direction:column;gap:3px;align-items:center;justify-content:end;min-height:26px}
+.mks.row{flex-direction:row;justify-content:end;align-self:center}
+.mk{background:var(--ink);color:var(--bg);border-radius:6px;padding:0 7px;font:600 13px/20px "Geist Mono",monospace;white-space:nowrap}
+.mk.oob{background:var(--bad);color:#fff}
+.vnote{font-size:13px;color:var(--bad);margin-top:4px}
+.empty-note{color:var(--mute);font-size:14.5px;padding:6px 0}
+/* memória */
+.legend{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:13px;color:var(--mute);margin-bottom:4px}
+.legend i{display:inline-block;width:14px;height:14px;border-radius:3px;vertical-align:-2px;margin-right:5px;border:1px solid var(--line)}
+.mem{overflow-x:auto;padding-bottom:4px}
+.mrow{display:flex;align-items:flex-start;padding:20px 0 16px}
+.maddr{width:62px;flex:none;font:500 13px "Geist Mono",monospace;color:var(--mute);padding-top:14px}
+.cells{display:flex}
+.cell{--w:42px;width:var(--w);flex:none;margin:2px;height:44px;border:1px solid var(--line);border-radius:6px;background:var(--code);display:flex;flex-direction:column;align-items:center;justify-content:center}
+.b-bin .cell{--w:50px;height:58px}
+.cell small{font:10.5px "Geist Mono",monospace;color:var(--mute);line-height:1}
+.cell b{font:500 14.5px/1.25 "Geist Mono",monospace;text-align:center}
+.b-bin .cell b{font-size:12.5px}
+.cell.free b{color:var(--mute);opacity:.5}
+.cell.junk b{color:var(--bad)}
+.cell.unk b,.cell.hdr b{color:var(--mute)}
+.cell.pad,.cell.hdr{background:repeating-linear-gradient(135deg,transparent 0 5px,light-dark(#d5d7db,#33363c) 5px 7px)}
+.vb{display:flex;position:relative;border-radius:9px;box-shadow:0 0 0 2.5px var(--c);background:color-mix(in srgb,var(--c) 12%,transparent);margin:0 1px}
+.vb.dead{opacity:.45;box-shadow:0 0 0 2px var(--c) inset}
+.vb .cell{border-color:color-mix(in srgb,var(--c) 40%,var(--line))}
+.vlab{position:absolute;left:0;bottom:100%;margin-bottom:3px;font-size:13px;font-weight:600;white-space:nowrap;background:var(--c);color:#fff;border-radius:6px 6px 6px 0;padding:0 7px;line-height:17px;z-index:2}
+.vlab em{font-style:normal;font-weight:400;opacity:.92;margin-left:5px}
+.pt{display:flex;position:relative;border-radius:7px;background:color-mix(in srgb,var(--t,transparent) 26%,transparent)}
+.pt+.pt{box-shadow:-1.5px 0 0 color-mix(in srgb,var(--c) 70%,transparent)}
+.pt .ix{position:absolute;top:100%;left:0;right:0;text-align:center;font:600 11.5px/15px "Geist Mono",monospace;color:var(--c);white-space:nowrap}
+.flash{animation:fl 1.1s ease-out}
+@keyframes fl{0%,30%{background:var(--acc);color:#fff}}
+.cell.flash b{color:inherit}
+.appear{animation:ap .8s ease-out}
+@keyframes ap{from{box-shadow:0 0 0 12px transparent;transform:scale(.97)}}
+#ptrs{position:absolute;left:0;top:0;pointer-events:none;z-index:6;overflow:visible}
+table{border-collapse:collapse;width:100%;font-size:14px;margin-top:10px}
+th{text-align:left;font-weight:500;color:var(--mute);font-size:13px;border-bottom:1px solid var(--line);padding:4px 8px}
+td{padding:5px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+td.n{font-family:"Geist Mono",monospace;white-space:nowrap}
+td .dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px}
+details{font-size:14.5px;color:var(--mute);margin-top:10px}
+details summary{cursor:pointer;color:var(--ink);font-weight:500;min-height:32px}
+details li{margin:3px 0}
+.ctl{position:fixed;left:0;right:0;margin:0 auto;width:max-content;max-width:calc(100vw - 16px);bottom:12px;display:flex;gap:6px;align-items:center;background:var(--ink);color:var(--bg);border-radius:16px;padding:8px 10px;box-shadow:0 10px 30px rgba(0,0,0,.25);z-index:20;flex-wrap:wrap;justify-content:center}
+.ctl button{min-width:44px;min-height:44px;border:0;border-radius:10px;background:transparent;color:inherit;cursor:pointer;font-weight:500;padding:0 11px;display:flex;align-items:center;gap:6px}
+.ctl button:hover:not(:disabled){background:color-mix(in srgb,var(--bg) 14%,transparent)}
+.ctl button.go{background:var(--acc);color:#fff}
+.ctl button:disabled{opacity:.35;cursor:default}
+.ctl svg{width:18px;height:18px;fill:currentColor}
+.ctl .cnt{font:500 14px "Geist Mono",monospace;padding:0 6px;min-width:9em;text-align:center}
+.ctl label{display:flex;align-items:center;gap:6px;font-size:13px;padding:0 4px}
+.ctl input{accent-color:var(--acc);width:84px}
+.ctl .md{display:inline-flex;border:1px solid color-mix(in srgb,var(--bg) 35%,transparent);border-radius:10px;overflow:hidden}
+.ctl .md button{border-radius:0;min-height:40px;font-size:14px}
+.ctl .md button[aria-pressed=true]{background:var(--bg);color:var(--ink)}
+.chip{position:fixed;left:0;top:0;z-index:50;pointer-events:none;background:var(--ink);color:var(--bg);font:600 15px "Geist Mono",monospace;padding:4px 10px;border-radius:8px;box-shadow:0 6px 18px rgba(0,0,0,.3);max-width:320px;overflow-wrap:anywhere;border:2px solid var(--cc,var(--acc))}
+.pulse{animation:pu .6s ease-in-out 2}
+@keyframes pu{50%{box-shadow:0 0 0 4px var(--acc)}}
+.ov{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;align-items:center;justify-content:center;z-index:60;padding:16px}
+.ov.on{display:flex}
+.dlg{background:var(--pan);border-radius:16px;max-width:1000px;width:100%;max-height:92vh;overflow:auto;padding:20px;display:grid;gap:16px;grid-template-columns:minmax(0,1fr)}
+@media(min-width:860px){.dlg{grid-template-columns:minmax(0,1.25fr) minmax(0,1fr)}}
+.dlg h3{margin:0 0 8px;font-size:20px}
+.dlg textarea{width:100%;min-height:380px;font:15px/1.6 "Geist Mono",monospace;background:var(--code);color:var(--ink);border:1px solid var(--line);border-radius:10px;padding:10px;resize:vertical;tab-size:4}
+.dlg .help{font-size:14.5px}
+.dlg .help code{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:0 4px;font-size:13.5px}
+.dlg .help ul{padding-left:18px;margin:6px 0}
+.row{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px}
+#perr{color:var(--bad);font-size:14.5px;margin-top:8px;min-height:1.2em}
+@media(prefers-reduced-motion:reduce){.flash,.appear,.pulse{animation:none}}
+@media(max-width:600px){h1{font-size:26px}.ctl .lbl{display:none}.maddr{width:50px;font-size:11px}}
+</style>
+</head>
+<body>
+<svg id="ptrs" aria-hidden="true"></svg>
+<header class="top">
+  <div>
+    <h1>Vetores e matrizes por dentro</h1>
+    <p>Veja o vetor como o aluno pensa (caixas com índices) e como a máquina guarda (bytes na pilha e no heap), com a CPU calculando cada endereço.</p>
+  </div>
+  <div class="tools">
+    <label class="fld">Exemplo<select id="exSel"></select></label>
+    <div class="fld">Linguagem<div class="seg" id="langSeg"></div></div>
+    <div class="fld" id="shapeFld">Matriz em C#<div class="seg" id="shapeSeg"></div></div>
+    <div class="fld">Bytes em<div class="seg" id="baseSeg"></div></div>
+    <button class="btn pri" id="editBtn">Editar programa</button>
+  </div>
+</header>
+
+<main>
+  <section class="col">
+    <div class="pan">
+      <h2>Programa completo <small id="langName"></small></h2>
+      <div id="code" role="region" aria-label="Código-fonte"></div>
+    </div>
+    <div class="pan" id="explain" aria-live="polite"></div>
+  </section>
+
+  <section class="col">
+    <div class="pan" id="cpu">
+      <h2>CPU <small>registradores e ULA</small></h2>
+      <div class="regs" id="regs"></div>
+      <div id="alu"><div class="alu-shape" id="aluShape">ULA</div><div class="alu-txt" id="aluTxt"></div></div>
+      <div class="ir">Instrução executada<code id="asmCur">—</code>Próxima<code class="nx" id="asmNext">—</code></div>
+    </div>
+    <div class="pan">
+      <h2>Saída <small>console</small></h2>
+      <pre id="out"></pre>
+    </div>
+  </section>
+
+  <section class="pan" id="visP">
+    <h2>Vetores e matrizes <small>visão lógica: valores e índices</small></h2>
+    <div id="vis"></div>
+  </section>
+
+  <section class="pan" id="stackP">
+    <h2>Pilha (stack) <small id="stackInfo"></small></h2>
+    <div class="legend">
+      <span>cada célula = 1 byte, com o endereço em cima</span>
+      <span><i style="border-color:var(--bad)"></i><span style="color:var(--bad)">vermelho</span> = lixo de memória</span>
+      <span><i style="background:repeating-linear-gradient(135deg,transparent 0 3px,#bbb 3px 5px)"></i>sem uso / cabeçalho</span>
+    </div>
+    <div class="mem" id="stack"></div>
+    <div id="vtab"></div>
+  </section>
+
+  <section class="pan" id="heapP">
+    <h2>Heap <small id="heapInfo"></small></h2>
+    <div class="mem" id="heap"></div>
+    <details>
+      <summary>Sobre este modelo (simplificações)</summary>
+      <ul>
+        <li>Endereços fictícios: pilha a partir de 0x1000 e heap a partir de 0x8000. As variáveis ficam em ordem crescente; numa máquina real a pilha cresce para endereços menores e o compilador escolhe a ordem.</li>
+        <li>O compilador reserva espaço para todas as variáveis locais da função de uma vez; quando um bloco termina, o nome sai de escopo, mas o espaço continua lá.</li>
+        <li>Em C e C++, um vetor local fica inteiro na pilha. Em Java e C#, a variável guarda só a <b>referência</b> (4 bytes em Java com referências comprimidas, 8 bytes em C#) e o vetor é um objeto no heap.</li>
+        <li>Objetos no heap: 12 bytes de cabeçalho + 4 bytes de <code>length</code>, e depois os elementos (o tamanho exato do cabeçalho varia entre máquinas virtuais). Em C#, <code>int[,]</code> guarda também o número de linhas e de colunas.</li>
+        <li>Java não tem matriz contígua: <code>int[][]</code> é um vetor de referências para vetores-linha. C# tem as duas formas: <code>int[,]</code> (um bloco só) e <code>int[][]</code> (como em Java).</li>
+        <li>O coletor de lixo não é simulado: objetos sem referência aparecem esmaecidos.</li>
+      </ul>
+    </details>
+  </section>
+</main>
+
+<nav class="ctl" aria-label="Controles da execução">
+  <button id="bReset" title="Reiniciar (Home)"><svg viewBox="0 0 24 24"><path d="M6 5h2v14H6zM20 5v14L9 12z"/></svg><span class="lbl">Início</span></button>
+  <button id="bBack" title="Voltar (←)"><svg viewBox="0 0 24 24"><path d="M17 5v14L6 12z"/></svg><span class="lbl">Voltar</span></button>
+  <span class="cnt" id="cnt">0 / 0</span>
+  <button id="bNext" class="go" title="Avançar (→)"><svg viewBox="0 0 24 24"><path d="M7 5v14l11-7z"/></svg><span class="lbl">Avançar</span></button>
+  <button id="bPlay" title="Executar automaticamente (espaço)"><svg viewBox="0 0 24 24" id="playIco"><path d="M4 5v14l8-7zM12 5v14l8-7z"/></svg><span class="lbl" id="playLbl">Executar</span></button>
+  <button id="bEnd" title="Ir ao fim (End)"><svg viewBox="0 0 24 24"><path d="M4 5v14l11-7zM16 5h2v14h-2z"/></svg><span class="lbl">Fim</span></button>
+  <span class="md" id="modeSeg" role="group" aria-label="Tamanho do passo"><button data-v="line">Por linha</button><button data-v="micro">Micro-passo</button></span>
+  <label>Velocidade<input type="range" id="spd" min="1" max="5" value="3" aria-label="Velocidade da animação"></label>
+</nav>
+
+<div class="ov" id="ov" role="dialog" aria-modal="true" aria-labelledby="dlgT">
+  <div class="dlg">
+    <div>
+      <h3 id="dlgT">Editar programa</h3>
+      <textarea id="ed" spellcheck="false" aria-label="Corpo do programa"></textarea>
+      <div id="perr"></div>
+      <div class="row"><button class="btn pri" id="edOk">Aplicar</button><button class="btn" id="edCancel">Cancelar</button></div>
+    </div>
+    <div class="help">
+      <h3>Como escrever</h3>
+      <p>Escreva só o <b>corpo</b> do programa, numa sintaxe comum às quatro linguagens (estilo C). O simulador gera o programa completo em C, C++, Java ou C#. Um comando por linha.</p>
+      <ul>
+        <li>Tipos: <code>int</code>, <code>double</code>, <code>char</code>, <code>float</code>, <code>short</code>, <code>long</code></li>
+        <li>Vetor: <code>int v[5];</code> ou <code>int v[5] = {3, 1, 4};</code> ou <code>int v[] = {3, 1, 4};</code></li>
+        <li>Matriz: <code>int m[2][3];</code> ou <code>int m[2][3] = {{1, 2, 3}, {4, 5, 6}};</code></li>
+        <li>Acesso: <code>v[i] = v[i] + 1;</code> e <code>m[i][j] = 0;</code> (em C# <code>int[,]</code> vira <code>m[i, j]</code>)</li>
+        <li>Atribuições: <code>=</code>, <code>+=</code>, <code>-=</code>, <code>*=</code>, <code>/=</code>, <code>i++</code>, <code>i--</code></li>
+        <li>Condições: <code>&lt; &lt;= &gt; &gt;= == !=</code>, <code>&amp;&amp;</code>, <code>||</code>, <code>!</code></li>
+        <li><code>for (int i = 0; i &lt; 5; i++) {</code> … <code>}</code></li>
+        <li><code>while (cond) {</code> … <code>}</code> e <code>if (cond) {</code> … <code>} else {</code> … <code>}</code> (as chaves são obrigatórias)</li>
+        <li>Saída: <code>print("v[", i, "] = ", v[i]);</code></li>
+        <li>Comentários: <code>// texto</code></li>
+      </ul>
+      <p>Limites do simulador: até 40 elementos por vetor, matrizes até 8 × 8 e 6 registradores.</p>
+    </div>
+  </div>
+</div>
+
+<script>
+{
+const SB = 0x1000, HB = 0x8000, NREG = 6, MAXSTACK = 320, MAXSTEPS = 20000;
+const PAL = ['#2f6fed','#e5484d','#1f9d55','#d97706','#8e4ec6','#0e9fb0','#d6409f','#6b8e23'];
+const ROWT = ['#2f6fed','#1f9d55','#d97706','#8e4ec6','#e5484d','#0e9fb0','#d6409f','#6b8e23'];
+const TYPES = ['char','short','int','long','float','double'];
+const LNAME = {c:'C', cpp:'C++', java:'Java', cs:'C#'};
+const OUTF = {c:'printf', cpp:'cout', java:'System.out.println', cs:'Console.WriteLine'};
+const RESERVED = new Set(('main Main class new public private static void return using namespace string String System Console printf cout endl bool boolean true false this if else while for do switch case break continue const unsigned signed sizeof struct byte object var in out ref base is as params final import package default goto try catch throw null print std args include length Length int char short long float double').split(' '));
+const MN = {'+':'ADD','-':'SUB','*':'MUL','/':'DIV','%':'MOD','<':'CMPLT','<=':'CMPLE','>':'CMPGT','>=':'CMPGE','==':'CMPEQ','!=':'CMPNE'};
+
+const EX = [
+ {n:'1. Declarar e preencher um vetor', s:`int v[5];
+for (int i = 0; i < 5; i++) {
+    v[i] = i * 10;
+}
+print("v[3] = ", v[3]);`},
+ {n:'2. Somar os elementos', s:`int v[5] = {3, 8, 1, 6, 4};
+int soma = 0;
+for (int i = 0; i < 5; i++) {
+    soma = soma + v[i];
+}
+print("Soma = ", soma);`},
+ {n:'3. Encontrar o maior', s:`int v[6] = {7, 2, 9, 4, 9, 1};
+int maior = v[0];
+for (int i = 1; i < 6; i++) {
+    if (v[i] > maior) {
+        maior = v[i];
+    }
+}
+print("Maior = ", maior);`},
+ {n:'4. Busca sequencial (while)', s:`int v[6] = {12, 5, 31, 8, 20, 17};
+int x = 8;
+int i = 0;
+while (i < 6 && v[i] != x) {
+    i++;
+}
+if (i < 6) {
+    print(x, " está na posição ", i);
+} else {
+    print(x, " não foi encontrado");
+}`},
+ {n:'5. Inverter o vetor', s:`int v[6] = {1, 2, 3, 4, 5, 6};
+int esq = 0;
+int dir = 5;
+while (esq < dir) {
+    int aux = v[esq];
+    v[esq] = v[dir];
+    v[dir] = aux;
+    esq++;
+    dir--;
+}
+for (int k = 0; k < 6; k++) {
+    print("v[", k, "] = ", v[k]);
+}`},
+ {n:'6. Média de notas (double)', s:`double notas[4] = {7.5, 8.0, 6.5, 9.0};
+double soma = 0.0;
+for (int i = 0; i < 4; i++) {
+    soma += notas[i];
+}
+double media = soma / 4;
+print("Média = ", media);`},
+ {n:'7. Matriz: preencher e somar a diagonal', s:`int m[3][3];
+for (int i = 0; i < 3; i++) {
+    for (int j = 0; j < 3; j++) {
+        m[i][j] = i * 3 + j;
+    }
+}
+int diag = 0;
+for (int k = 0; k < 3; k++) {
+    diag += m[k][k];
+}
+print("Soma da diagonal = ", diag);`},
+ {n:'8. Soma de matrizes', s:`int a[2][3] = {{1, 2, 3}, {4, 5, 6}};
+int b[2][3] = {{10, 20, 30}, {40, 50, 60}};
+int c[2][3];
+for (int i = 0; i < 2; i++) {
+    for (int j = 0; j < 3; j++) {
+        c[i][j] = a[i][j] + b[i][j];
+    }
+}
+print("c[1][2] = ", c[1][2]);`},
+ {n:'9. Matriz transposta', s:`int m[2][3] = {{1, 2, 3}, {4, 5, 6}};
+int t[3][2];
+for (int i = 0; i < 2; i++) {
+    for (int j = 0; j < 3; j++) {
+        t[j][i] = m[i][j];
+    }
+}
+print("t[2][1] = ", t[2][1]);`},
+ {n:'10. Acesso fora dos limites', s:`int v[3] = {10, 20, 30};
+int x = 7;
+for (int i = 0; i <= 3; i++) {   // erro: deveria ser i < 3
+    v[i] = 0;
+}
+print("x = ", x);`}
+];
+
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const hx = (n, w) => n.toString(16).toUpperCase().padStart(w, '0');
+const hexA = a => '0x' + hx(a, 4);
+const isInt = t => ['char','short','int','long'].includes(t);
+let LANG = 'c', BASE = 'hex', CSRECT = true, MODE = 'line', SRC = EX[0].s, exIdx = 0;
+try { const sv = JSON.parse(localStorage.getItem('vetsim') || 'null'); if (sv) { LANG = sv.lang || LANG; BASE = sv.base || BASE; MODE = sv.mode || MODE; CSRECT = sv.rect ?? true; if (sv.src) { SRC = sv.src; exIdx = sv.ex ?? 0; } } } catch (e) {}
+const save = () => { try { localStorage.setItem('vetsim', JSON.stringify({lang:LANG, base:BASE, mode:MODE, rect:CSRECT, src:SRC, ex:exIdx})); } catch (e) {} };
+const J = () => LANG === 'java' || LANG === 'cs';
+const REFSZ = () => LANG === 'java' ? 4 : 8;
+const sizeOf = t => t === 'ref' ? REFSZ() : t === 'char' ? (J() ? 2 : 1) : {short:2, int:4, long:8, float:4, double:8, bool:1}[t];
+const tname = t => t === 'long' && !J() ? 'long long' : t === 'bool' ? {c:'int', cpp:'bool', java:'boolean', cs:'bool'}[LANG] : t;
+const promote = (a, b) => (a === 'double' || b === 'double') ? 'double' : (a === 'float' || b === 'float') ? 'float' : (a === 'long' || b === 'long') ? 'long' : 'int';
+
+let AST = [], CODE = null, COMP = null, RUN = null, S = null, k = 0, busy = false, playing = false;
+
+/* ===================== análise ===================== */
+function charCode(v) { if (v[0] !== '\\') return v.charCodeAt(0); return ({n:10, t:9, '0':0, '\\':92, "'":39, '"':34, r:13})[v[1]] ?? v.charCodeAt(1); }
+function lexLine(s) {
+  const toks = []; let i = 0, comment = null, m;
+  while (i < s.length) {
+    const r = s.slice(i);
+    if (/^\s/.test(r)) { i++; continue; }
+    if (r.startsWith('//')) { comment = r.slice(2).trim(); break; }
+    if ((m = /^"((?:\\.|[^"\\])*)"/.exec(r))) { toks.push({k:'str', v:m[1]}); i += m[0].length; continue; }
+    if ((m = /^'(\\.|[^'\\])'/.exec(r))) { toks.push({k:'chr', v:m[1], text:m[0]}); i += m[0].length; continue; }
+    if ((m = /^(?:\d+\.\d*|\.\d+|\d+)(?:[eE][+-]?\d+)?[fF]?/.exec(r))) { toks.push({k:'num', v:m[0]}); i += m[0].length; continue; }
+    if ((m = /^[A-Za-z_]\w*/.exec(r))) { toks.push({k:'id', v:m[0]}); i += m[0].length; continue; }
+    if ((m = /^(==|!=|<=|>=|&&|\|\||\+\+|--|\+=|-=|\*=|\/=|%=|[()+\-*\/%=;,<>!{}\[\]])/.exec(r))) { toks.push({k:'op', v:m[0]}); i += m[0].length; continue; }
+    throw new Error(`Caractere inesperado: "${r[0]}".`);
+  }
+  return {toks, comment};
+}
+function mkNum(text) {
+  const f = /[fF]$/.test(text), core = text.replace(/[fF]$/, '');
+  if (f || /[.eE]/.test(core)) { const v = Number(core); return {k:'lit', type: f ? 'float' : 'double', value: f ? Math.fround(v) : v, text: core}; }
+  const b = BigInt(core);
+  if (b > 9223372036854775807n) throw new Error('Número grande demais (não cabe em 64 bits).');
+  return {k:'lit', type: b <= 2147483647n ? 'int' : 'long', value: b, text: core};
+}
+function parseSource(src) {
+  let nid = 0, lastClosed = null;
+  const root = [], stk = [{body:root, node:null}];
+  const lines = src.replace(/\r/g, '').split('\n');
+  while (lines.length && !lines[lines.length - 1].trim()) lines.pop();
+  lines.forEach((ln, li) => {
+    try {
+      const L = lexLine(ln), T = L.toks; let p = 0;
+      const is = (k, v) => T[p] && T[p].k === k && (v === undefined || T[p].v === v);
+      const next = () => T[p++];
+      const expect = (k, v, w) => { if (!is(k, v)) throw new Error(`Esperado ${w || '"' + v + '"'}${T[p] ? `, mas encontrado "${T[p].v}"` : ' no fim da linha'}.`); return next(); };
+      const top = () => stk[stk.length - 1];
+      const mk = o => { o.id = nid++; o.line = li + 1; o.comment = L.comment; return o; };
+      const add = o => { top().body.push(mk(o)); return o; };
+      const done = () => { if (p < T.length) throw new Error(`Sobrou "${T[p].v}" no fim da linha. Use um comando por linha.`); };
+      const nm = () => { const t = expect('id', undefined, 'um nome'); if (RESERVED.has(t.v)) throw new Error(`"${t.v}" é palavra reservada em alguma das linguagens e não pode ser nome de variável.`); return t.v; };
+      const primary = () => {
+        const t = T[p]; if (!t) throw new Error('Expressão incompleta.');
+        if (t.k === 'num') { next(); return mkNum(t.v); }
+        if (t.k === 'chr') { next(); return {k:'lit', type:'char', value:BigInt(charCode(t.v)), text:t.text}; }
+        if (t.k === 'id') { const name = nm(), ix = []; while (is('op', '[')) { next(); ix.push(expr()); expect('op', ']', '"]"'); } return ix.length ? {k:'idx', name, ix} : {k:'var', name}; }
+        if (is('op', '(')) { next(); const e = expr(); expect('op', ')', '")"'); return {k:'paren', e}; }
+        throw new Error(`Símbolo inesperado "${t.v}".`);
+      };
+      const unary = () => {
+        if (is('op', '-')) { next(); return {k:'neg', e:unary()}; }
+        if (is('op', '+')) { next(); return unary(); }
+        if (is('op', '!')) { next(); return {k:'not', e:unary()}; }
+        if (is('op', '(') && T[p+1] && T[p+1].k === 'id' && TYPES.includes(T[p+1].v) && T[p+2] && T[p+2].v === ')') { const ty = T[p+1].v; p += 3; return {k:'cast', type:ty, e:unary()}; }
+        return primary();
+      };
+      const lvl = (sub, ops, kind) => () => { let l = sub(); while (T[p] && T[p].k === 'op' && ops.includes(T[p].v)) { const op = next().v; l = {k:kind, op, l, r:sub()}; } return l; };
+      const mul = lvl(unary, ['*','/','%'], 'bin'), addE = lvl(mul, ['+','-'], 'bin'), rel = lvl(addE, ['<','<=','>','>='], 'cmp'), eq = lvl(rel, ['==','!='], 'cmp');
+      const andE = () => { let l = eq(); while (is('op', '&&')) { next(); l = {k:'and', l, r:eq()}; } return l; };
+      const expr = () => { let l = andE(); while (is('op', '||')) { next(); l = {k:'or', l, r:andE()}; } return l; };
+      const paren = () => { expect('op', '(', '"("'); const e = expr(); expect('op', ')', '")"'); return e; };
+      const initList = depth => { expect('op', '{', '"{"'); const items = []; if (!is('op', '}')) do { items.push(depth === 2 ? initList(1) : expr()); } while (is('op', ',') && next()); expect('op', '}', '"}"'); return items; };
+      const simple = () => {
+        if (is('id') && TYPES.includes(T[p].v)) {
+          const type = next().v, name = nm(), dims = []; let auto = false;
+          while (is('op', '[')) {
+            next();
+            if (is('op', ']')) { if (dims.length) throw new Error('Só a primeira dimensão pode ficar sem tamanho.'); auto = true; dims.push(0); next(); continue; }
+            const t = expect('num', undefined, 'o tamanho (um número inteiro)');
+            if (!/^\d+$/.test(t.v) || +t.v < 1) throw new Error('O tamanho precisa ser um número inteiro positivo.');
+            dims.push(+t.v); expect('op', ']', '"]"');
+          }
+          if (dims.length > 2) throw new Error('Este simulador vai até matrizes de 2 dimensões.');
+          let init = null;
+          if (is('op', '=')) { next(); init = dims.length ? initList(dims.length) : expr(); }
+          if (dims.length && init) {
+            if (auto) dims[0] = init.length;
+            if (init.length > dims[0]) throw new Error(`A lista tem ${init.length} valores, mas o tamanho é ${dims[0]}.`);
+            if (dims.length === 2) init.forEach((r, i) => { if (r.length > dims[1]) throw new Error(`A linha ${i} tem ${r.length} valores, mas a matriz tem ${dims[1]} colunas.`); });
+          } else if (auto) throw new Error('Vetor sem tamanho precisa de lista de valores, como int v[] = {1, 2, 3};');
+          if (dims.length === 1 && dims[0] > 40) throw new Error('Este simulador mostra vetores de até 40 elementos.');
+          if (dims.length === 2 && (dims[0] > 8 || dims[1] > 8)) throw new Error('Este simulador mostra matrizes de até 8 × 8.');
+          return {kind:'decl', type, name, dims: dims.length ? dims : null, init, auto};
+        }
+        if (is('id', 'print')) {
+          next(); expect('op', '(', '"("'); const args = [];
+          if (!is('op', ')')) do { args.push(is('str') ? {str:next().v} : {expr:expr()}); } while (is('op', ',') && next());
+          expect('op', ')', '")"'); return {kind:'print', args};
+        }
+        if (!is('id')) throw new Error('Comando não reconhecido.');
+        const name = nm(), ix = [];
+        while (is('op', '[')) { next(); ix.push(expr()); expect('op', ']', '"]"'); }
+        const lv = {name, ix};
+        if (is('op', '++') || is('op', '--')) return {kind:'incr', lv, op:next().v[0]};
+        for (const o of ['=','+=','-=','*=','/=','%=']) if (is('op', o)) { next(); return {kind:'assign', lv, op:o, expr:expr()}; }
+        throw new Error(`Esperado "=", "+=", "++" ou parecido depois de ${name}.`);
+      };
+      if (!T.length) { add(L.comment !== null ? {kind:'comment', text:L.comment} : {kind:'blank'}); return; }
+      let closed = null;
+      if (is('op', '}')) { next(); if (stk.length === 1) throw new Error('Este "}" não fecha nenhum bloco.'); closed = stk.pop(); }
+      if (is('id', 'else')) {
+        const e = closed || lastClosed;
+        if (!e || !e.node || e.node.kind !== 'if' || e.part !== 'then') throw new Error('"else" sem um "if" logo antes.');
+        next(); const ifn = e.node;
+        if (is('id', 'if')) {
+          next(); const cond = paren(); expect('op', '{', '"{" no fim da linha'); done();
+          const n = mk({kind:'if', cond, then:[], else:null, chained:true}); ifn.else = [n];
+          stk.push({body:n.then, node:n, part:'then', chain:e.chain.concat(n)});
+        } else { expect('op', '{', '"{" depois de else'); done(); ifn.else = []; stk.push({body:ifn.else, node:ifn, part:'else', chain:e.chain}); }
+        lastClosed = null; return;
+      }
+      if (closed) { done(); lastClosed = closed; return; }
+      lastClosed = null;
+      if (is('id', 'for')) {
+        next(); expect('op', '(', '"("');
+        const init = is('op', ';') ? null : simple(); expect('op', ';', '";"');
+        const cond = is('op', ';') ? null : expr(); expect('op', ';', '";"');
+        const update = is('op', ')') ? null : simple(); expect('op', ')', '")"');
+        expect('op', '{', '"{" no fim da linha'); done();
+        if (init && (init.kind === 'print' || init.dims)) throw new Error('No início do for use uma declaração simples, como int i = 0.');
+        if (update && (update.kind === 'decl' || update.kind === 'print')) throw new Error('No fim do for use um incremento, como i++.');
+        const n = add({kind:'for', init, cond, update, body:[]}); stk.push({body:n.body, node:n, part:'body'}); return;
+      }
+      if (is('id', 'while')) { next(); const cond = paren(); expect('op', '{', '"{" no fim da linha'); done(); const n = add({kind:'while', cond, body:[]}); stk.push({body:n.body, node:n, part:'body'}); return; }
+      if (is('id', 'if')) { next(); const cond = paren(); expect('op', '{', '"{" no fim da linha (as chaves são obrigatórias)'); done(); const n = add({kind:'if', cond, then:[], else:null}); stk.push({body:n.then, node:n, part:'then', chain:[n]}); return; }
+      const st = simple(); expect('op', ';', '";"'); done(); add(st);
+    } catch (e) { if (!e.line) e.line = li + 1; throw e; }
+  });
+  if (stk.length > 1) { const e = new Error('Falta fechar um bloco com "}".'); e.line = stk[stk.length - 1].node.line; throw e; }
+  return root;
+}
+
+/* ===================== geração do programa ===================== */
+function litText(n) {
+  if (n.type === 'float') { let t = n.text; if (!/[.eE]/.test(t)) t += '.0'; return t + 'f'; }
+  if (n.type === 'long') return n.text + (J() ? 'L' : 'LL');
+  return n.text;
+}
+const isRect = key => { const v = COMP && COMP.vars[key]; return v && v.shape === 'rect'; };
+function ex(n) {
+  switch (n.k) {
+    case 'lit': return litText(n);
+    case 'var': return n.name;
+    case 'idx': return n.name + (n.key && isRect(n.key) ? `[${n.ix.map(ex).join(', ')}]` : n.ix.map(e => `[${ex(e)}]`).join(''));
+    case 'paren': return '(' + ex(n.e) + ')';
+    case 'neg': return '-' + ex(n.e);
+    case 'not': return '!' + ex(n.e);
+    case 'cast': return `(${tname(n.type)}) ${ex(n.e)}`;
+    case 'bin': case 'cmp': return `${ex(n.l)} ${n.op} ${ex(n.r)}`;
+    case 'and': return `${ex(n.l)} && ${ex(n.r)}`;
+    case 'or': return `${ex(n.l)} || ${ex(n.r)}`;
+  }
+}
+function src(n) { // sintaxe comum, para as mensagens
+  switch (n.k) {
+    case 'lit': return n.type === 'char' ? n.text : n.text + (n.type === 'float' ? 'f' : '');
+    case 'var': return n.name;
+    case 'idx': return n.name + n.ix.map(e => `[${src(e)}]`).join('');
+    case 'paren': return '(' + src(n.e) + ')';
+    case 'neg': return '-' + src(n.e);
+    case 'not': return '!' + src(n.e);
+    case 'cast': return `(${n.type}) ${src(n.e)}`;
+    case 'bin': case 'cmp': return `${src(n.l)} ${n.op} ${src(n.r)}`;
+    case 'and': return `${src(n.l)} && ${src(n.r)}`;
+    case 'or': return `${src(n.l)} || ${src(n.r)}`;
+  }
+}
+function printCode(args) {
+  const ty = e => e.ty || 'int';
+  if (LANG === 'c') {
+    let f = '', a = '';
+    args.forEach(x => {
+      if (x.str !== undefined) f += x.str.replace(/%/g, '%%');
+      else { const t = ty(x.expr); f += t === 'char' ? '%c' : t === 'long' ? '%lld' : isInt(t) ? '%d' : '%f'; a += ', ' + ex(x.expr); }
+    });
+    return `printf("${f}\\n"${a})`;
+  }
+  if (LANG === 'cpp') return 'cout << ' + args.map(x => x.str !== undefined ? `"${x.str}"` : ex(x.expr)).concat('endl').join(' << ');
+  if (LANG === 'java') {
+    if (!args.length) return 'System.out.println()';
+    if (args.length === 1 && args[0].str === undefined) return `System.out.println(${ex(args[0].expr)})`;
+    const ps = args.map(x => x.str !== undefined ? `"${x.str}"` : ['bin','neg'].includes(x.expr.k) ? `(${ex(x.expr)})` : ex(x.expr));
+    if (args[0].str === undefined) ps.unshift('""');
+    return `System.out.println(${ps.join(' + ')})`;
+  }
+  if (!args.length) return 'Console.WriteLine()';
+  if (args.length === 1 && args[0].str === undefined) return `Console.WriteLine(${ex(args[0].expr)})`;
+  if (args.every(x => x.str !== undefined)) return `Console.WriteLine("${args.map(x => x.str).join('')}")`;
+  return `Console.WriteLine($"${args.map(x => x.str !== undefined ? x.str.replace(/[{}]/g, c => c + c) : `{${ex(x.expr)}}`).join('')}")`;
+}
+function zeroLit(t) { return t === 'char' ? "'\\0'" : t === 'float' ? '0.0f' : t === 'double' ? '0.0' : t === 'long' ? (J() ? '0L' : '0LL') : '0'; }
+function declCode(st) {
+  const tn = tname(st.type), name = st.name, d = st.dims;
+  if (!d) return `${tn} ${name}${st.init ? ' = ' + ex(st.init) : ''}`;
+  const row = (items, n) => { const a = items.map(ex); if (J()) while (a.length < n) a.push(zeroLit(st.type)); return `{${a.join(', ')}}`; };
+  if (!J()) {
+    const dimTxt = (st.auto ? '[]' : `[${d[0]}]`) + (d[1] ? `[${d[1]}]` : '');
+    if (!st.init) return `${tn} ${name}${dimTxt}`;
+    return `${tn} ${name}${dimTxt} = ` + (d.length === 1 ? `{${st.init.map(ex).join(', ')}}` : `{${st.init.map(r => `{${r.map(ex).join(', ')}}`).join(', ')}}`);
+  }
+  const rows = () => { const r = st.init.slice(); while (r.length < d[0]) r.push([]); return r; };
+  if (d.length === 1) return st.init ? `${tn}[] ${name} = ${row(st.init, d[0])}` : `${tn}[] ${name} = new ${tn}[${d[0]}]`;
+  if (LANG === 'cs' && CSRECT) return st.init ? `${tn}[,] ${name} = {${rows().map(r => row(r, d[1])).join(', ')}}` : `${tn}[,] ${name} = new ${tn}[${d[0]}, ${d[1]}]`;
+  if (LANG === 'java') return st.init ? `${tn}[][] ${name} = {${rows().map(r => row(r, d[1])).join(', ')}}` : `${tn}[][] ${name} = new ${tn}[${d[0]}][${d[1]}]`;
+  return st.init ? `${tn}[][] ${name} = { ${rows().map(r => `new ${tn}[] ${row(r, d[1])}`).join(', ')} }` : `${tn}[][] ${name} = { ${Array.from({length:d[0]}, () => `new ${tn}[${d[1]}]`).join(', ')} }`;
+}
+function lvCode(lv) { return ex(lv.ix.length ? {k:'idx', name:lv.name, ix:lv.ix, key:lv.key} : {k:'var', name:lv.name}); }
+function simpleCode(st) {
+  if (st.kind === 'decl') return declCode(st);
+  if (st.kind === 'assign') return `${lvCode(st.lv)} ${st.op} ${ex(st.expr)}`;
+  if (st.kind === 'incr') return `${lvCode(st.lv)}${st.op}${st.op}`;
+  if (st.kind === 'print') return printCode(st.args);
+  return '';
+}
+function codegen(ast) {
+  const allman = LANG === 'cs', lines = [], stmtLine = {}, endLine = {}, elseLine = {};
+  const ind = n => '    '.repeat(n);
+  const pre = {c:['#include <stdio.h>', '', 'int main(void) {'], cpp:['#include <iostream>', 'using namespace std;', '', 'int main() {'],
+    java:['public class Main {', '    public static void main(String[] args) {'], cs:['using System;', '', 'class Program', '{', '    static void Main()', '    {']}[LANG];
+  lines.push(...pre);
+  const mainLine = LANG === 'cs' ? 4 : pre.length - 1, base = J() ? 2 : 1;
+  const cm = st => st.comment ? '   // ' + st.comment : '';
+  const open = (h, c, l) => { if (allman) { lines.push(ind(l) + h + c); lines.push(ind(l) + '{'); } else lines.push(ind(l) + h + ' {' + c); };
+  const block = (list, l) => list.forEach(st => stmt(st, l));
+  function stmt(st, l) {
+    switch (st.kind) {
+      case 'blank': lines.push(''); break;
+      case 'comment': stmtLine[st.id] = lines.length; lines.push(ind(l) + '// ' + st.text); break;
+      case 'for': stmtLine[st.id] = lines.length; open(`for (${st.init ? simpleCode(st.init) : ''}; ${st.cond ? ex(st.cond) : ''}; ${st.update ? simpleCode(st.update) : ''})`, cm(st), l); block(st.body, l + 1); endLine[st.id] = lines.length; lines.push(ind(l) + '}'); break;
+      case 'while': stmtLine[st.id] = lines.length; open(`while (${ex(st.cond)})`, cm(st), l); block(st.body, l + 1); endLine[st.id] = lines.length; lines.push(ind(l) + '}'); break;
+      case 'if': {
+        const chain = []; let n = st;
+        stmtLine[n.id] = lines.length; open(`if (${ex(n.cond)})`, cm(n), l);
+        for (;;) {
+          chain.push(n); block(n.then, l + 1);
+          if (!n.else) break;
+          if (n.else.length === 1 && n.else[0].chained) {
+            const m = n.else[0];
+            if (allman) { lines.push(ind(l) + '}'); elseLine[n.id] = stmtLine[m.id] = lines.length; lines.push(ind(l) + `else if (${ex(m.cond)})` + cm(m)); lines.push(ind(l) + '{'); }
+            else { elseLine[n.id] = stmtLine[m.id] = lines.length; lines.push(ind(l) + `} else if (${ex(m.cond)}) {` + cm(m)); }
+            n = m; continue;
+          }
+          if (allman) { lines.push(ind(l) + '}'); elseLine[n.id] = lines.length; lines.push(ind(l) + 'else'); lines.push(ind(l) + '{'); }
+          else { elseLine[n.id] = lines.length; lines.push(ind(l) + '} else {'); }
+          block(n.else, l + 1); break;
+        }
+        chain.forEach(x => endLine[x.id] = lines.length); lines.push(ind(l) + '}'); break;
+      }
+      default: stmtLine[st.id] = lines.length; lines.push(ind(l) + simpleCode(st) + ';' + cm(st));
+    }
+  }
+  block(ast, base);
+  const finalLine = lines.length;
+  lines.push(...{c:['    return 0;', '}'], cpp:['    return 0;', '}'], java:['    }', '}'], cs:['    }', '}']}[LANG]);
+  return {lines, stmtLine, endLine, elseLine, mainLine, finalLine};
+}
+
+/* ===================== compilação para micro-operações ===================== */
+const CM = {
+  undecl: n => ({c:`error: '${n}' undeclared (first use in this function)`, cpp:`error: '${n}' was not declared in this scope`, java:`error: cannot find symbol\n  symbol:   variable ${n}`, cs:`error CS0103: The name '${n}' does not exist in the current context`}[LANG]),
+  redecl: (n, t) => ({c:`error: redefinition of '${n}'`, cpp:`error: redeclaration of '${tname(t)} ${n}'`, java:`error: variable ${n} is already defined in method main(String[])`, cs:`error CS0128: A local variable named '${n}' is already defined in this scope`}[LANG]),
+  shadow: n => ({java:`error: variable ${n} is already defined in method main(String[])`, cs:`error CS0136: A local variable named '${n}' cannot be declared in this scope because it would give a different meaning to '${n}'`}[LANG]),
+  uninit: n => ({java:`error: variable ${n} might not have been initialized`, cs:`error CS0165: Use of unassigned local variable '${n}'`, c:`warning: '${n}' is used uninitialized [-Wuninitialized]`, cpp:`warning: '${n}' is used uninitialized [-Wuninitialized]`}[LANG]),
+  lossy: (f, t) => ({java:`error: incompatible types: possible lossy conversion from ${f} to ${t}`, cs:`error CS0266: Cannot implicitly convert type '${f}' to '${t}'. An explicit conversion exists (are you missing a cast?)`}[LANG] || ''),
+  notbool: t => ({java:`error: incompatible types: ${tname(t)} cannot be converted to boolean`, cs:`error CS0029: Cannot implicitly convert type '${t}' to 'bool'`}[LANG] || ''),
+  fmod: (a, b) => ({c:`error: invalid operands to binary % (have '${a}' and '${b}')`, cpp:`error: invalid operands of types '${a}' and '${b}' to binary 'operator%'`}[LANG] || ''),
+  subs: n => ({c:`error: subscripted value is neither array nor pointer nor vector`, cpp:`error: invalid types for array subscript`, java:`error: array required, but ${n} found`, cs:`error CS0021: Cannot apply indexing with [] to an expression of type '${n}'`}[LANG])
+};
+const WIDEN = {char:['int','long','float','double'], short:['int','long','float','double'], int:['long','float','double'], long:['float','double'], float:['double'], double:[]};
+function constOf(n) {
+  if (n.k === 'paren') return constOf(n.e);
+  if (n.k === 'neg') { const c = constOf(n.e); return c && {type:c.type, value:-c.value}; }
+  return n.k === 'lit' ? {type:n.type, value:n.value} : null;
+}
+function implicitOK(from, to, e) {
+  if (WIDEN[from].includes(to)) return true;
+  const c = e && constOf(e);
+  if (c && c.type === 'int') {
+    if (to === 'short' && c.value >= -32768n && c.value <= 32767n) return true;
+    if (to === 'char' && LANG === 'java' && c.value >= 0n && c.value <= 65535n) return true;
+  }
+  return false;
+}
+function floatLit(n, t) { if (t !== 'float' || !n) return; const l = n.k === 'paren' || n.k === 'neg' ? (function f(x) { return x.k === 'paren' || x.k === 'neg' ? f(x.e) : x; })(n) : n; if (l.k === 'lit' && l.type === 'double') { l.type = 'float'; l.value = Math.fround(l.value); } }
+function varsIn(n, out) { if (!n) return out; if (n.k === 'var' && n.key) out.add(n.key); ['e','l','r'].forEach(f => n[f] && varsIn(n[f], out)); (n.ix || []).forEach(e => varsIn(e, out)); return out; }
+
+function compile(ast) {
+  const vars = {}, order = [], ops = [], errors = [], warnings = [], idxUse = {};
+  const scopes = [new Map()];
+  let cur = 0, si = -1, g = 0, grp = 0, at = null, assigned = new Set();
+  const fail = (msg, cc = '') => { const e = new Error(msg); e.cc = cc; e.isC = true; throw e; };
+  const emit = o => { o.s = si; o.g = g; if (at) o.at = at; ops.push(o); return o; };
+  const ng = () => { g = ++grp; };
+  const look = name => { for (let i = scopes.length - 1; i >= 0; i--) { const k = scopes[i].get(name); if (k) return vars[k]; } return null; };
+  const rchk = r => { if (r >= NREG) fail('Expressão complexa demais para os 6 registradores deste simulador. Divida a conta usando variáveis auxiliares.'); };
+  const isBoolOK = t => t === 'bool' || (!J() && isInt(t));
+  const boolChk = t => { if (!isBoolOK(t)) fail(`Aqui é preciso uma condição (uma comparação como <code>i &lt; 5</code>), mas a expressão é do tipo <code>${tname(t)}</code>.`, CM.notbool(t)); };
+  const uninit = v => {
+    if (assigned.has(v.key)) return;
+    if (J()) fail(`A variável <b>${v.name}</b> pode ser lida antes de receber um valor. ${LNAME[LANG]} não permite isso: o programa nem compila.`, CM.uninit(v.name));
+    if (!warnings.some(w => w.key === v.key)) warnings.push({si, key:v.key, msg:`A variável <b>${v.name}</b> é lida antes de receber um valor. ${LNAME[LANG]} compila (no máximo com um aviso), mas o valor lido é lixo de memória.`, cc:CM.uninit(v.name)});
+  };
+  function declare(st) {
+    const sc = scopes[scopes.length - 1];
+    if (sc.has(st.name)) fail(`A variável <b>${st.name}</b> já foi declarada neste bloco.`, CM.redecl(st.name, st.type));
+    if (J() && look(st.name)) fail(`Já existe uma variável <b>${st.name}</b> visível aqui. ${LNAME[LANG]} não permite declarar outra com o mesmo nome dentro de um bloco interno.`, CM.shadow(st.name));
+    let key = st.name, n = 2; while (vars[key]) key = st.name + '#' + n++;
+    const kind = !st.dims ? 'scalar' : J() ? 'ref' : 'arr', es = sizeOf(st.type);
+    const size = kind === 'scalar' ? es : kind === 'ref' ? REFSZ() : es * st.dims[0] * (st.dims[1] || 1);
+    const al = kind === 'ref' ? REFSZ() : es, a = Math.ceil(cur / al) * al;
+    const shape = !st.dims ? null : st.dims.length === 1 ? '1d' : !J() ? 'c2' : (LANG === 'cs' && CSRECT) ? 'rect' : 'jagged';
+    const v = {key, name:st.name, type:st.type, kind, dims:st.dims, es, size, addr:SB + a, padFrom:SB + cur, color:PAL[order.length % PAL.length], shape};
+    cur = a + size; vars[key] = v; order.push(v); sc.set(st.name, key); st.key = key;
+    if (cur > MAXSTACK) fail(`As variáveis ocupam mais de ${MAXSTACK} bytes de pilha, além do que este simulador mostra. Use vetores menores.`);
+    return v;
+  }
+  function conv(et, tt, e, r, why) {
+    if (et === tt) return;
+    if (et === 'bool') fail('O resultado de uma comparação não pode ser guardado numa variável numérica neste simulador.');
+    if (J() && why !== 'compound' && !implicitOK(et, tt, e)) fail(`Guardar um <code>${et}</code> num <code>${tt}</code> pode perder informação. ${LNAME[LANG]} exige conversão explícita (cast), por exemplo <code>(${tt})</code>.`, CM.lossy(et, tt));
+    emit({t:'CVT', r, from:et, to:tt, why});
+  }
+  function arith(op, lt, rt, ra, rb) {
+    if (lt === 'bool' || rt === 'bool') fail('Não dá para fazer conta com o resultado de uma comparação.');
+    const pt = promote(lt, rt);
+    if (op === '%' && !isInt(pt) && !J()) fail('Em C e C++ o operador <code>%</code> só funciona com inteiros (para reais use <code>fmod</code>).', CM.fmod(tname(lt), tname(rt)));
+    if (lt !== pt) emit({t:'CVT', r:ra, from:lt, to:pt, why: isInt(pt) ? 'promo' : 'arith'});
+    if (rt !== pt) emit({t:'CVT', r:rb, from:rt, to:pt, why: isInt(pt) ? 'promo' : 'arith'});
+    emit({t:'ALU', op, d:ra, a:ra, b:rb, type:pt});
+    return pt;
+  }
+  function idxGen(e, r) {
+    rchk(r);
+    const t = gen(e, r);
+    if (!isInt(t) || (t === 'long' && J())) fail(`O índice precisa ser um número inteiro, mas <code>${esc(src(e))}</code> é do tipo <code>${tname(t)}</code>.`);
+    if (t !== 'int') emit({t:'CVT', r, from:t, to:'int', why:'promo'});
+  }
+  function addr(n, r) {
+    const v = look(n.name);
+    if (!v) fail(`A variável <b>${n.name}</b> é usada sem ter sido declarada.`, CM.undecl(n.name));
+    if (v.kind === 'scalar') fail(`<b>${n.name}</b> não é um vetor: não pode ser usada com <code>[ ]</code>.`, CM.subs(v.type));
+    if (n.ix.length !== v.dims.length) fail(v.dims.length === 2 ? `<b>${n.name}</b> é uma matriz: use dois índices, como <code>${n.name}[i][j]</code>.` : `<b>${n.name}</b> é um vetor de uma dimensão: use um índice só.`);
+    n.key = v.key;
+    const u = idxUse[v.key] || (idxUse[v.key] = [new Set(), new Set()]);
+    if (v.kind === 'arr') {
+      rchk(r + 1); idxGen(n.ix[0], r); if (v.dims.length === 2) idxGen(n.ix[1], r + 1);
+      emit({t:'ADDR', d:r, base:'var', v:v.key, i:r, j:v.dims.length === 2 ? r + 1 : null, cols:v.dims[1] || 0, es:v.es, off:0, arr:v.key});
+    } else if (v.shape === 'rect') {
+      rchk(r + 2); emit({t:'LOADV', r, v:v.key}); idxGen(n.ix[0], r + 1); idxGen(n.ix[1], r + 2);
+      emit({t:'CHK', ref:r, i:r + 1, j:r + 2, arr:v.key});
+      emit({t:'ADDR', d:r, base:'reg', b:r, i:r + 1, j:r + 2, cols:v.dims[1], es:v.es, off:24, arr:v.key});
+    } else {
+      rchk(r + 1); emit({t:'LOADV', r, v:v.key}); idxGen(n.ix[0], r + 1); emit({t:'CHK', ref:r, i:r + 1, arr:v.key});
+      if (v.dims.length === 1) emit({t:'ADDR', d:r, base:'reg', b:r, i:r + 1, j:null, cols:0, es:v.es, off:16, arr:v.key});
+      else {
+        emit({t:'ADDR', d:r, base:'reg', b:r, i:r + 1, j:null, cols:0, es:REFSZ(), off:16, arr:v.key, row:true});
+        emit({t:'LOADM', r, a:r, type:'ref', arr:v.key, row:true});
+        idxGen(n.ix[1], r + 1); emit({t:'CHK', ref:r, i:r + 1, arr:v.key, row:true});
+        emit({t:'ADDR', d:r, base:'reg', b:r, i:r + 1, j:null, cols:0, es:v.es, off:16, arr:v.key});
+      }
+    }
+    n.ix.forEach((e, d) => varsIn(e, new Set()).forEach(kk => u[d].add(kk)));
+    return v;
+  }
+  function gen(n, r) {
+    rchk(r);
+    switch (n.k) {
+      case 'lit': emit({t:'LOADI', r, type:n.type, value:n.value, disp:n.type === 'char' ? n.text : litText(n)}); return n.ty = n.type;
+      case 'var': {
+        const v = look(n.name);
+        if (!v) fail(`A variável <b>${n.name}</b> é usada sem ter sido declarada.`, CM.undecl(n.name));
+        if (v.kind !== 'scalar') fail(`<b>${n.name}</b> é ${v.dims.length === 2 ? 'uma matriz' : 'um vetor'}: para usar um elemento, escreva <code>${n.name}[i]${v.dims.length === 2 ? '[j]' : ''}</code>.`);
+        n.key = v.key; uninit(v); emit({t:'LOADV', r, v:v.key}); return n.ty = v.type;
+      }
+      case 'idx': { const v = addr(n, r); emit({t:'LOADM', r, a:r, type:v.type, arr:v.key}); return n.ty = v.type; }
+      case 'paren': return n.ty = gen(n.e, r);
+      case 'neg': { const t = gen(n.e, r); if (t === 'bool') fail('Não dá para trocar o sinal de uma comparação.'); const pt = promote(t, 'int'); if (t !== pt) emit({t:'CVT', r, from:t, to:pt, why:'promo'}); emit({t:'NEG', r, type:pt}); return n.ty = pt; }
+      case 'not': { const t = gen(n.e, r); boolChk(t); emit({t:'NOT', r}); return n.ty = 'bool'; }
+      case 'cast': { const t = gen(n.e, r); if (t === 'bool') fail('Não é possível converter uma comparação para número neste simulador.'); if (t !== n.type) emit({t:'CVT', r, from:t, to:n.type, why:'cast'}); return n.ty = n.type; }
+      case 'bin': { const lt = gen(n.l, r), rt = gen(n.r, r + 1); return n.ty = arith(n.op, lt, rt, r, r + 1); }
+      case 'cmp': {
+        const lt = gen(n.l, r), rt = gen(n.r, r + 1);
+        if (lt === 'bool' || rt === 'bool') fail('Para combinar comparações use <code>&amp;&amp;</code> ou <code>||</code>.');
+        const pt = promote(lt, rt);
+        if (lt !== pt) emit({t:'CVT', r, from:lt, to:pt, why:'arith'});
+        if (rt !== pt) emit({t:'CVT', r:r + 1, from:rt, to:pt, why:'arith'});
+        emit({t:'ALU', op:n.op, d:r, a:r, b:r + 1, type:pt, cmp:true}); return n.ty = 'bool';
+      }
+      case 'and': case 'or': {
+        const lt = gen(n.l, r); boolChk(lt);
+        const j = emit({t: n.k === 'and' ? 'JFK' : 'JTK', r, txt:src(n.l)});
+        const rt = gen(n.r, r); boolChk(rt); j.to = ops.length; return n.ty = 'bool';
+      }
+    }
+  }
+  function initVals(st, v) {
+    const cv = e => {
+      const c = constOf(e);
+      if (!c) fail('Na lista de inicialização use apenas valores constantes (números ou caracteres).');
+      if (c.type !== v.type && J() && !implicitOK(c.type, v.type, e)) fail(`O valor <code>${esc(src(e))}</code> é <code>${c.type}</code> e o vetor é de <code>${v.type}</code>: ${LNAME[LANG]} exige conversão explícita.`, CM.lossy(c.type, v.type));
+      return cvt(c.type, v.type, c.value);
+    };
+    const z = isInt(v.type) ? 0n : 0;
+    if (v.dims.length === 1) { const a = st.init.map(cv); while (a.length < v.dims[0]) a.push(z); return a; }
+    return Array.from({length:v.dims[0]}, (_, i) => { const r = (st.init[i] || []).map(cv); while (r.length < v.dims[1]) r.push(z); return r; });
+  }
+  function declStmt(st) {
+    if (st.init && !st.dims) floatLit(st.init, st.type);
+    if (st.dims && st.init) st.init.flat().forEach(x => floatLit(x, st.type));
+    const v = declare(st);
+    emit({t:'ALLOC', v:v.key});
+    if (!st.dims) { if (st.init) { const t = gen(st.init, 0); conv(t, v.type, st.init, 0, 'assign'); emit({t:'STORE', v:v.key, r:0}); assigned.add(v.key); } return; }
+    const vals = st.init ? initVals(st, v) : null;
+    if (v.kind === 'arr') { if (vals) emit({t:'INITC', v:v.key, vals}); }
+    else { emit({t:'NEWARR', r:0, v:v.key, vals}); emit({t:'STORE', v:v.key, r:0}); }
+    assigned.add(v.key);
+  }
+  function assignStmt(st) {
+    const lv = st.lv, op = st.kind === 'incr' ? st.op : st.op === '=' ? '=' : st.op[0];
+    if (!lv.ix.length) {
+      const v = look(lv.name);
+      if (!v) fail(`A variável <b>${lv.name}</b> recebe um valor, mas não foi declarada.`, CM.undecl(lv.name));
+      if (v.kind !== 'scalar') fail(`Não é possível atribuir a ${v.dims.length === 2 ? 'uma matriz inteira' : 'um vetor inteiro'} de uma vez: atribua elemento por elemento, como <code>${lv.name}[i] = …</code>.`);
+      lv.key = v.key;
+      if (op === '=') { floatLit(st.expr, v.type); const t = gen(st.expr, 0); conv(t, v.type, st.expr, 0, 'assign'); }
+      else {
+        uninit(v); emit({t:'LOADV', r:0, v:v.key});
+        let rt; if (st.kind === 'incr') { emit({t:'LOADI', r:1, type:'int', value:1n, disp:'1'}); rt = 'int'; } else rt = gen(st.expr, 1);
+        const pt = arith(op, v.type, rt, 0, 1); conv(pt, v.type, null, 0, 'compound');
+      }
+      emit({t:'STORE', v:v.key, r:0}); assigned.add(v.key); return;
+    }
+    const pv = look(lv.name); if (pv && op === '=') floatLit(st.expr, pv.type);
+    if (op === '=') { const t = gen(st.expr, 0); const v = addr(lv, 1); conv(t, v.type, st.expr, 0, 'assign'); emit({t:'STOREM', a:1, r:0, type:v.type, arr:v.key}); return; }
+    const v = addr(lv, 0); emit({t:'LOADM', r:1, a:0, type:v.type, arr:v.key});
+    let rt; if (st.kind === 'incr') { emit({t:'LOADI', r:2, type:'int', value:1n, disp:'1'}); rt = 'int'; } else rt = gen(st.expr, 2);
+    const pt = arith(op, v.type, rt, 1, 2); conv(pt, v.type, null, 1, 'compound');
+    emit({t:'STOREM', a:0, r:1, type:v.type, arr:v.key});
+  }
+  function printStmt(st) {
+    if (!st.args.length) emit({t:'OUTS', str:'', nl:true});
+    st.args.forEach((a, i) => {
+      const nl = i === st.args.length - 1;
+      if (a.str !== undefined) emit({t:'OUTS', str:unesc(a.str), nl});
+      else { const t = gen(a.expr, 0); if (t === 'bool') fail('Este simulador não imprime o resultado de comparações.'); emit({t:'OUTV', r:0, type:t, nl}); }
+    });
+  }
+  function simple(st) { if (st.kind === 'decl') declStmt(st); else if (st.kind === 'print') printStmt(st); else assignStmt(st); }
+  function exitScope(owner, atK) {
+    const sc = scopes.pop(), keys = [...sc.values()];
+    if (keys.length) { si = owner; at = atK; ng(); emit({t:'EXIT', keys}); at = null; }
+  }
+  function block(list, owner, atK) { scopes.push(new Map()); list.forEach(stmt); exitScope(owner, atK); }
+  function stmt(st) {
+    if (st.kind === 'blank' || st.kind === 'comment') return;
+    si = st.id; at = null; ng();
+    if (st.kind === 'for') {
+      scopes.push(new Map());
+      if (st.init) simple(st.init);
+      const afterInit = new Set(assigned);
+      si = st.id; ng(); const Lc = ops.length; let jf = null;
+      if (st.cond) { const t = gen(st.cond, 0); boolChk(t); jf = emit({t:'JF', r:0, kind:'for', txt:src(st.cond)}); }
+      block(st.body, st.id, 'end');
+      si = st.id; at = null; ng();
+      if (st.update) simple(st.update);
+      emit({t:'JMP', to:Lc, kind:'for'});
+      if (jf) jf.to = ops.length;
+      exitScope(st.id, 'end');
+      assigned = afterInit;
+    } else if (st.kind === 'while') {
+      const before = new Set(assigned), Lc = ops.length;
+      const t = gen(st.cond, 0); boolChk(t); const jf = emit({t:'JF', r:0, kind:'while', txt:src(st.cond)});
+      block(st.body, st.id, 'end');
+      si = st.id; at = 'end'; ng(); emit({t:'JMP', to:Lc, kind:'while'}); at = null;
+      jf.to = ops.length; assigned = before;
+    } else if (st.kind === 'if') {
+      const t = gen(st.cond, 0); boolChk(t);
+      const jf = emit({t:'JF', r:0, kind:'if', txt:src(st.cond), hasElse:!!st.else});
+      const before = new Set(assigned);
+      block(st.then, st.id, st.else ? 'else' : 'end');
+      if (st.else) {
+        const aThen = assigned; assigned = new Set(before);
+        si = st.id; at = 'else'; ng(); const jm = emit({t:'JMP', kind:'else'}); at = null;
+        jf.to = ops.length; block(st.else, st.id, 'end'); jm.to = ops.length;
+        assigned = new Set([...aThen].filter(x => assigned.has(x)));
+      } else { jf.to = ops.length; assigned = before; }
+    } else simple(st);
+  }
+  try { ng(); emit({t:'START'}); ast.forEach(stmt); }
+  catch (e) { if (!e.isC) throw e; errors.push({si, msg:e.message, cc:e.cc}); }
+  si = -2; at = null; ng(); emit({t:'END'});
+  return {vars, order, ops, errors, warnings, idxUse, total:cur};
+}
+const unesc = s => s.replace(/\\(.)/g, (m, c) => ({n:'\n', t:'\t', '\\':'\\', '"':'"', "'":"'", '0':''})[c] ?? c);
+
+/* ===================== valores e bytes ===================== */
+function wrap(t, b) {
+  switch (t) {
+    case 'char': return J() ? BigInt.asUintN(16, b) : BigInt.asIntN(8, b);
+    case 'short': return BigInt.asIntN(16, b);
+    case 'int': return BigInt.asIntN(32, b);
+    default: return BigInt.asIntN(64, b);
+  }
+}
+function enc(t, v) {
+  const n = sizeOf(t), dv = new DataView(new ArrayBuffer(n));
+  switch (t) {
+    case 'char': n === 1 ? dv.setInt8(0, Number(BigInt.asIntN(8, v))) : dv.setUint16(0, Number(BigInt.asUintN(16, v)), true); break;
+    case 'short': dv.setInt16(0, Number(BigInt.asIntN(16, v)), true); break;
+    case 'int': dv.setInt32(0, Number(BigInt.asIntN(32, v)), true); break;
+    case 'long': dv.setBigInt64(0, BigInt.asIntN(64, v), true); break;
+    case 'float': dv.setFloat32(0, v, true); break;
+    case 'double': dv.setFloat64(0, v, true); break;
+    case 'ref': n === 4 ? dv.setUint32(0, v, true) : dv.setBigUint64(0, BigInt(v), true); break;
+  }
+  return [...new Uint8Array(dv.buffer)];
+}
+function dec(t, bytes) {
+  const dv = new DataView(new Uint8Array(bytes).buffer);
+  switch (t) {
+    case 'char': return bytes.length === 1 ? BigInt(dv.getInt8(0)) : BigInt(dv.getUint16(0, true));
+    case 'short': return BigInt(dv.getInt16(0, true));
+    case 'int': return BigInt(dv.getInt32(0, true));
+    case 'long': return dv.getBigInt64(0, true);
+    case 'float': return dv.getFloat32(0, true);
+    case 'double': return dv.getFloat64(0, true);
+    case 'ref': return bytes.length === 4 ? dv.getUint32(0, true) : Number(dv.getBigUint64(0, true));
+  }
+}
+function cvt(from, to, v) {
+  if (from === to) return v;
+  if (isInt(from) && isInt(to)) return wrap(to, v);
+  if (isInt(from)) { const n = Number(v); return to === 'float' ? Math.fround(n) : n; }
+  if (!isInt(to)) return to === 'float' ? Math.fround(v) : v;
+  if (!isFinite(v)) return 0n;
+  return wrap(to, BigInt(Math.trunc(v)));
+}
+function shortF(v) { for (let p = 1; p < 10; p++) { const x = parseFloat(v.toPrecision(p)); if (Math.fround(x) === v) return String(x); } return String(v); }
+function num(t, v) {
+  if (t === 'bool') return LANG === 'c' ? (v ? '1' : '0') : String(v);
+  if (t === 'ref' || t === 'addr') return hexA(v);
+  if (isInt(t)) return v.toString();
+  if (!isFinite(v)) return String(v);
+  const s = t === 'float' ? shortF(v) : String(v);
+  return /[.e]/.test(s) ? s : s + '.0';
+}
+const glyph = v => { const c = Number(BigInt.asUintN(16, v)); return c >= 32 && c < 127 ? ` '${String.fromCharCode(c)}'` : ''; };
+const rv = r => r ? num(r.type, r.v) + (r.type === 'char' ? glyph(r.v) : '') : '?';
+function fmtVal(t, v) {
+  if (t === 'bool' || t === 'ref' || t === 'addr' || BASE === 'dec') return num(t, v) + (t === 'char' && BASE === 'dec' ? glyph(v) : '');
+  const b = enc(t, v).reverse();
+  return BASE === 'hex' ? '0x' + b.map(x => hx(x, 2)).join('') : b.map(x => x.toString(2).padStart(8, '0')).join(' ');
+}
+const byteStr = b => BASE === 'hex' ? hx(b, 2) : BASE === 'bin' ? b.toString(2).padStart(8, '0').replace(/^(....)/, '$1<br>') : String(b);
+function gfmt(v, p) {
+  if (v === 0) return '0';
+  let [m, x] = v.toExponential(p - 1).split('e'); x = parseInt(x);
+  if (x < -4 || x >= p) { if (m.includes('.')) m = m.replace(/\.?0+$/, ''); return m + 'e' + (x < 0 ? '-' : '+') + String(Math.abs(x)).padStart(2, '0'); }
+  let f = v.toFixed(Math.max(0, p - 1 - x)); if (f.includes('.')) f = f.replace(/\.?0+$/, ''); return f;
+}
+function fmtOut(t, v) {
+  if (t === 'char') return String.fromCharCode(J() ? Number(v) : Number(BigInt.asUintN(8, v)));
+  if (isInt(t)) return v.toString();
+  if (isNaN(v)) return J() ? 'NaN' : 'nan';
+  if (!isFinite(v)) return (v < 0 ? '-' : '') + (LANG === 'java' ? 'Infinity' : LANG === 'cs' ? '∞' : 'inf');
+  if (LANG === 'c') return v.toFixed(6);
+  if (LANG === 'cpp') return gfmt(v, 6);
+  const n = Number(t === 'float' ? shortF(v) : String(v)), a = Math.abs(n);
+  if (LANG === 'java') {
+    if (n === 0) return '0.0';
+    if (a >= 1e-3 && a < 1e7) { const s = String(n); return s.includes('.') ? s : s + '.0'; }
+    let [m, x] = n.toExponential().split('e'); if (!m.includes('.')) m += '.0'; return m + 'E' + parseInt(x);
+  }
+  const x = n === 0 ? 0 : Math.floor(Math.log10(a));
+  if (x >= (t === 'float' ? 7 : 15) || x < -5) { let [m, e] = n.toExponential().split('e'); e = parseInt(e); return m + 'E' + (e < 0 ? '-' : '+') + String(Math.abs(e)).padStart(2, '0'); }
+  return String(n);
+}
+function junk(a) { let x = Math.imul(a ^ 0x5bd1e995, 2654435761) >>> 0; x ^= x >>> 15; x = Math.imul(x, 0x2c1b3c6d) >>> 0; x ^= x >>> 12; return x & 255; }
+const range = (a, n) => n === 1 ? hexA(a) : `${hexA(a)}–${hexA(a + n - 1)}`;
+
+/* ===================== estado e execução ===================== */
+function newState() {
+  const NS = Math.max(32, Math.ceil((COMP.total + 8) / 8) * 8);
+  const stack = [], scell = [];
+  for (let i = 0; i < NS; i++) { stack.push(junk(SB + i)); scell.push('free'); }
+  return {stack, scell, heap:[], hcell:[], objs:[], hp:0, alloc:new Set(), dead:new Set(), init:new Set(), regs:new Array(NREG).fill(null), alu:null, out:'', error:null, halt:false, pc:0, msg:'', ttl:'', acc:null, ch:null};
+}
+function cloneS(s) { return {...s, stack:[...s.stack], scell:[...s.scell], heap:[...s.heap], hcell:[...s.hcell], objs:s.objs.map(o => ({...o})), alloc:new Set(s.alloc), dead:new Set(s.dead), init:new Set(s.init), regs:s.regs.map(r => r && {...r})}; }
+function reg(s, a, n) {
+  if (a >= SB && a + n <= SB + s.stack.length) return {m:s.stack, c:s.scell, i:a - SB};
+  if (a >= HB && a + n <= HB + s.heap.length) return {m:s.heap, c:s.hcell, i:a - HB};
+  return null;
+}
+const rd = (s, a, n) => { const R = reg(s, a, n); return R ? R.m.slice(R.i, R.i + n) : null; };
+function wr(s, a, bytes, st = 'val') { const R = reg(s, a, bytes.length); if (!R) return false; bytes.forEach((b, j) => { R.m[R.i + j] = b; R.c[R.i + j] = st; s.ch.bytes.add(a + j); }); return true; }
+const readVar = (s, v) => dec(v.kind === 'ref' ? 'ref' : v.type, rd(s, v.addr, v.size));
+const objAt = (s, a) => s.objs.find(o => a >= o.addr && a < o.addr + o.size);
+function newObj(s, o) {
+  s.hp = Math.ceil(s.hp / 8) * 8;
+  const hdr = o.kind === 'rect' ? 24 : 16, size = hdr + o.len * o.es, addr = HB + s.hp;
+  while (s.heap.length < s.hp + size) { s.heap.push(0); s.hcell.push('free'); }
+  for (let i = 0; i < size; i++) { s.heap[s.hp + i] = 0; s.hcell[s.hp + i] = i < 12 ? 'hdr' : 'val'; s.ch.bytes.add(addr + i); }
+  const obj = {...o, id:s.objs.length, addr, hdr, size};
+  s.objs.push(obj); s.hp += size;
+  const w = (off, val) => enc('int', BigInt(val)).forEach((b, j) => s.heap[addr - HB + off + j] = b);
+  w(12, o.len); if (o.kind === 'rect') { w(16, o.rows); w(20, o.cols); }
+  s.ch.objs.add(obj.id);
+  return obj;
+}
+function whatIs(s, a) {
+  for (const v of COMP.order) {
+    if (!s.alloc.has(v.key) || a < v.addr || a >= v.addr + v.size) continue;
+    if (v.kind === 'arr') { const lin = Math.floor((a - v.addr) / v.es); return {txt: v.dims.length === 2 ? `${v.name}[${Math.floor(lin / v.dims[1])}][${lin % v.dims[1]}]` : `${v.name}[${lin}]`, key:v.key}; }
+    return {txt:v.name, key:v.key};
+  }
+  const o = objAt(s, a);
+  if (o) {
+    const off = a - o.addr; if (off < o.hdr) return {txt:'o cabeçalho do objeto'};
+    const lin = Math.floor((off - o.hdr) / o.es);
+    return {txt: o.kind === 'rect' ? `${o.owner}[${Math.floor(lin / o.cols)}, ${lin % o.cols}]` : o.row != null ? `${o.owner}[${o.row}][${lin}]` : o.kind === 'refs' ? `${o.owner}[${lin}] (referência para a linha ${lin})` : `${o.owner}[${lin}]`, obj:o.id};
+  }
+  return {txt:'bytes que não pertencem a nenhuma variável'};
+}
+const segv = (s) => { s.error = 'Segmentation fault (core dumped)'; s.out += s.error + '\n'; s.halt = true; s.ch.out = true; };
+function opLine(op) { if (!op) return -1; if (op.s === -1) return CODE.mainLine; if (op.s === -2) return CODE.finalLine; return op.at === 'end' ? CODE.endLine[op.s] : op.at === 'else' ? CODE.elseLine[op.s] : CODE.stmtLine[op.s]; }
+
+function applyOp(s) {
+  const op = COMP.ops[s.pc]; s.pc++;
+  const ch = s.ch = {regs:new Set(), bytes:new Set(), vars:new Set(), objs:new Set(), alu:false, out:false};
+  const V = op.v && COMP.vars[op.v], L = LNAME[LANG];
+  switch (op.t) {
+    case 'START':
+      s.ttl = 'Início';
+      s.msg = `O sistema chama <code>${LANG === 'cs' ? 'Main' : 'main'}</code>. Na <b>pilha</b> é reservado o quadro (stack frame) com espaço para todas as variáveis locais da função. ${J() ? 'Os vetores, porém, vão para o <b>heap</b>: na pilha fica só a referência para eles.' : 'Em ' + L + ', os vetores locais também ficam inteiros na pilha.'}`;
+      break;
+    case 'ALLOC': {
+      ch.vars.add(V.key);
+      const again = s.alloc.has(V.key);
+      s.alloc.add(V.key); s.dead.delete(V.key);
+      s.ttl = 'Declaração';
+      if (again) {
+        if (J()) { for (let a = V.addr; a < V.addr + V.size; a++) { s.scell[a - SB] = 'unk'; ch.bytes.add(a); } s.init.delete(V.key); }
+        s.msg = `<b>${V.name}</b> é declarada de novo (nova passagem pelo bloco). O espaço é o mesmo de antes, ${range(V.addr, V.size)}: o compilador reservou tudo no início da função.` + (J() ? ` Em ${L} ela precisa receber valor antes de ser usada.` : ` Em ${L}, se não houver valor inicial, o conteúdo antigo continua lá.`);
+        break;
+      }
+      for (let a = V.padFrom; a < V.addr; a++) s.scell[a - SB] = 'pad';
+      for (let a = V.addr; a < V.addr + V.size; a++) { s.scell[a - SB] = J() ? 'unk' : 'junk'; ch.bytes.add(a); }
+      if (V.kind === 'scalar') s.msg = `Reservados <b>${V.size} byte${V.size > 1 ? 's' : ''}</b> na pilha para <b>${V.name}</b> (<code>${tname(V.type)}</code>), em ${range(V.addr, V.size)}.` + (J() ? ` Até receber um valor, ${L} não deixa usá-la (por isso “?”).` : ` Até receber um valor, o conteúdo é <b>lixo de memória</b> (vermelho).`);
+      else if (V.kind === 'arr') {
+        const n = V.dims[0] * (V.dims[1] || 1);
+        s.msg = `<code>${tname(V.type)} ${V.name}${V.dims.map(d => `[${d}]`).join('')}</code>: ${V.dims.length === 2 ? `${V.dims[0]} linhas × ${V.dims[1]} colunas = ${n} elementos` : `${n} elementos`} de ${V.es} byte${V.es > 1 ? 's' : ''} = <b>${V.size} bytes seguidos</b> na pilha (${range(V.addr, V.size)}). O nome <b>${V.name}</b> corresponde ao endereço do primeiro elemento, ${hexA(V.addr)}.`;
+        if (V.dims.length === 2) s.msg += ' A matriz é guardada <b>linha após linha</b> (row-major): as cores das linhas na visão lógica são as mesmas na memória.';
+        s.msg += ' Sem lista de valores, os elementos começam com lixo de memória.';
+      } else s.msg = `Reservados ${V.size} bytes na pilha para <b>${V.name}</b>. Em ${L}, a variável de um vetor guarda só uma <b>referência</b> (o endereço do objeto no heap), não os elementos.`;
+      if (V.padFrom < V.addr) s.msg += ` ${range(V.padFrom, V.addr - V.padFrom)} ${V.addr - V.padFrom > 1 ? 'ficaram' : 'ficou'} sem uso para alinhar ${V.name} num endereço múltiplo de ${V.kind === 'ref' ? V.size : V.es} (alinhamento).`;
+      break;
+    }
+    case 'EXIT': {
+      op.keys.forEach(kk => { s.dead.add(kk); ch.vars.add(kk); });
+      const names = op.keys.map(kk => COMP.vars[kk].name);
+      s.ttl = 'Fim do bloco';
+      s.msg = `O bloco terminou: ${names.map(n => `<b>${n}</b>`).join(', ')} ${names.length > 1 ? 'saem' : 'sai'} de escopo. O nome não pode mais ser usado, mas o espaço continua reservado no quadro da pilha.`;
+      if (op.keys.some(kk => COMP.vars[kk].kind === 'ref')) s.msg += ' Como a referência deixou de existir, o objeto no heap fica sem ninguém apontando para ele: o coletor de lixo poderá liberá-lo.';
+      break;
+    }
+    case 'LOADV': {
+      const v = readVar(s, V), t = V.kind === 'ref' ? 'ref' : V.type;
+      s.regs[op.r] = {type:t, v}; ch.regs.add(op.r);
+      s.ttl = 'Leitura da memória';
+      s.msg = t === 'ref' ? `A CPU lê a <b>referência</b> guardada em <b>${V.name}</b>: ${hexA(v)}, o endereço do vetor no heap. Ela vai para <b>R${op.r}</b>.`
+        : `A CPU lê ${V.size > 1 ? `os ${V.size} bytes` : 'o byte'} de <b>${V.name}</b> (${range(V.addr, V.size)}) e coloca o valor <b>${rv(s.regs[op.r])}</b> em <b>R${op.r}</b>.`;
+      if (t !== 'ref' && !s.init.has(V.key)) s.msg += ` <b>Atenção:</b> ${V.name} nunca recebeu valor; a CPU leu <b>lixo de memória</b>.`;
+      break;
+    }
+    case 'STORE': {
+      const R = s.regs[op.r]; wr(s, V.addr, enc(V.kind === 'ref' ? 'ref' : V.type, R.v)); ch.vars.add(V.key);
+      s.init.add(V.key);
+      s.ttl = 'Escrita na memória';
+      s.msg = V.kind === 'ref' ? `A referência ${hexA(R.v)} é gravada em <b>${V.name}</b>, na pilha. ${V.name} não contém os números: contém o endereço do vetor, e a seta mostra para onde ela aponta.`
+        : `O valor <b>${rv(R)}</b> de <b>R${op.r}</b> é gravado em <b>${V.name}</b> (${range(V.addr, V.size)}).`;
+      break;
+    }
+    case 'LOADI':
+      s.regs[op.r] = {type:op.type, v:op.value}; ch.regs.add(op.r);
+      s.ttl = 'Valor literal';
+      s.msg = `A constante <code>${esc(op.disp)}</code> está escrita no próprio programa e vai direto para <b>R${op.r}</b>.`;
+      break;
+    case 'ALU': {
+      const A = s.regs[op.a], B = s.regs[op.b]; ch.alu = true; ch.regs.add(op.d);
+      if (op.cmp) {
+        const a = A.v, b = B.v, res = op.op === '<' ? a < b : op.op === '<=' ? a <= b : op.op === '>' ? a > b : op.op === '>=' ? a >= b : op.op === '==' ? a === b : a !== b;
+        s.regs[op.d] = {type:'bool', v:res};
+        s.alu = {sym:op.op, text:`${rv(A)} ${op.op} ${rv(B)} → ${num('bool', res)}`};
+        s.ttl = 'Comparação na ULA';
+        s.msg = `A ULA compara ${rv(A)} ${op.op} ${rv(B)}: o resultado é <b>${res ? 'verdadeiro' : 'falso'}</b> (${num('bool', res)})${LANG === 'c' ? '; em C, verdadeiro é 1 e falso é 0' : ''}.`;
+        break;
+      }
+      s.ttl = 'Cálculo na ULA';
+      if (isInt(op.type) && (op.op === '/' || op.op === '%') && B.v === 0n) {
+        s.alu = {sym:op.op, text:`${rv(A)} ${op.op} 0 = ?`};
+        s.error = {c:'Floating point exception (core dumped)', cpp:'Floating point exception (core dumped)', java:'Exception in thread "main" java.lang.ArithmeticException: / by zero', cs:'Unhandled exception. System.DivideByZeroException: Attempted to divide by zero.'}[LANG];
+        s.msg = 'Divisão inteira por zero! O programa é interrompido.'; s.out += s.error + '\n'; ch.out = true; s.halt = true; break;
+      }
+      let w, m;
+      if (isInt(op.type)) { const a = A.v, b = B.v; m = op.op === '+' ? a + b : op.op === '-' ? a - b : op.op === '*' ? a * b : op.op === '/' ? a / b : a % b; w = wrap(op.type, m); }
+      else { const a = A.v, b = B.v; w = op.op === '+' ? a + b : op.op === '-' ? a - b : op.op === '*' ? a * b : op.op === '/' ? a / b : a % b; if (op.type === 'float') w = Math.fround(w); }
+      s.regs[op.d] = {type:op.type, v:w};
+      s.alu = {sym:op.op, text:`${rv(A)} ${op.op} ${rv(B)} = ${num(op.type, w)}`};
+      s.msg = `A <b>ULA</b> calcula ${rv(A)} ${op.op} ${rv(B)} = <b>${num(op.type, w)}</b> e guarda o resultado em <b>R${op.d}</b>.`;
+      if (isInt(op.type) && op.op === '/') s.msg += ' Os dois operandos são inteiros, então é uma <b>divisão inteira</b>.';
+      if (isInt(op.type) && w !== m) s.msg += ` <b>Overflow!</b> ${m} não cabe em ${sizeOf(op.type) * 8} bits.`;
+      break;
+    }
+    case 'NEG': { const A = s.regs[op.r], w = isInt(op.type) ? wrap(op.type, -A.v) : -A.v; s.regs[op.r] = {type:op.type, v:w}; ch.regs.add(op.r); ch.alu = true; s.alu = {sym:'−', text:`−(${num(op.type, A.v)}) = ${num(op.type, w)}`}; s.ttl = 'Troca de sinal'; s.msg = `A ULA troca o sinal: −(${num(op.type, A.v)}) = <b>${num(op.type, w)}</b>.`; break; }
+    case 'NOT': { const A = s.regs[op.r], w = !(A.type === 'bool' ? A.v : A.v !== 0n); s.regs[op.r] = {type:'bool', v:w}; ch.regs.add(op.r); ch.alu = true; s.alu = {sym:'!', text:`!${num('bool', !w)} = ${num('bool', w)}`}; s.ttl = 'Negação'; s.msg = `O operador <code>!</code> inverte a condição: o resultado é <b>${w ? 'verdadeiro' : 'falso'}</b>.`; break; }
+    case 'CVT': {
+      const A = s.regs[op.r], w = cvt(op.from, op.to, A.v); s.regs[op.r] = {type:op.to, v:w}; ch.regs.add(op.r);
+      s.ttl = op.why === 'cast' ? 'Conversão explícita (cast)' : 'Conversão automática';
+      s.msg = `O valor em <b>R${op.r}</b> passa de <code>${tname(op.from)}</code> para <code>${tname(op.to)}</code>: ${rv(A)} → <b>${rv(s.regs[op.r])}</b>.` + (op.why === 'promo' ? ' Em contas e índices, <code>char</code> e <code>short</code> são promovidos a <code>int</code>.' : op.why === 'arith' ? ' Numa conta entre tipos diferentes, o operando “menor” é convertido para o tipo “maior”.' : '') + (!isInt(op.from) && isInt(op.to) ? ' A parte fracionária é descartada.' : '');
+      break;
+    }
+    case 'INITC': {
+      const flat = V.dims.length === 2 ? op.vals.flat() : op.vals;
+      flat.forEach((val, i) => wr(s, V.addr + i * V.es, enc(V.type, val)));
+      ch.vars.add(V.key);
+      s.ttl = 'Lista de inicialização';
+      s.msg = `Os valores da lista <code>{…}</code> são copiados para os ${flat.length} elementos de <b>${V.name}</b>, um depois do outro na pilha. Se a lista tiver menos valores que o tamanho, ${L} completa o resto com zeros.`;
+      break;
+    }
+    case 'NEWARR': {
+      const d = V.dims, et = V.type, es = sizeOf(et);
+      let top;
+      if (V.shape === '1d') top = newObj(s, {kind:'arr', et, len:d[0], es, owner:V.name, color:V.color});
+      else if (V.shape === 'rect') top = newObj(s, {kind:'rect', et, len:d[0] * d[1], rows:d[0], cols:d[1], es, owner:V.name, color:V.color});
+      else {
+        top = newObj(s, {kind:'refs', et:'ref', len:d[0], es:REFSZ(), owner:V.name, color:V.color});
+        for (let i = 0; i < d[0]; i++) { const row = newObj(s, {kind:'arr', et, len:d[1], es, owner:V.name, row:i, color:V.color}); wr(s, top.addr + 16 + i * REFSZ(), enc('ref', row.addr)); }
+      }
+      if (op.vals) {
+        if (V.shape === '1d') op.vals.forEach((x, i) => wr(s, top.addr + 16 + i * es, enc(et, x)));
+        else if (V.shape === 'rect') op.vals.flat().forEach((x, i) => wr(s, top.addr + 24 + i * es, enc(et, x)));
+        else op.vals.forEach((r, i) => { const ra = dec('ref', rd(s, top.addr + 16 + i * REFSZ(), REFSZ())); r.forEach((x, j) => wr(s, ra + 16 + j * es, enc(et, x))); });
+      }
+      s.regs[op.r] = {type:'ref', v:top.addr}; ch.regs.add(op.r);
+      s.ttl = 'Criação do vetor no heap (new)';
+      if (V.shape === '1d') s.msg = `<code>new ${et}[${d[0]}]</code> cria um objeto no <b>heap</b>, em ${hexA(top.addr)}: 12 bytes de cabeçalho, 4 bytes com o <b>length</b> (${d[0]}) e ${d[0]} × ${es} = ${d[0] * es} bytes de elementos.`;
+      else if (V.shape === 'rect') s.msg = `<code>new ${et}[${d[0]}, ${d[1]}]</code> cria <b>um único bloco</b> no heap, em ${hexA(top.addr)}: cabeçalho, length total (${d[0] * d[1]}), número de linhas e de colunas, e depois os ${d[0] * d[1]} elementos linha após linha, como em C.`;
+      else s.msg = `Matriz em ${L} = <b>vetor de vetores</b>. Primeiro é criado um vetor com ${d[0]} referências (uma por linha) e depois ${d[0]} vetores-linha de ${d[1]} elementos cada, cada um num lugar do heap. As setas mostram quem aponta para quem.`;
+      s.msg += op.vals ? ' Em seguida os valores da lista são copiados para os elementos.' : ` Em ${L}, todo vetor novo começa com os elementos <b>zerados</b> (nada de lixo de memória).`;
+      s.msg += ` A expressão devolve a <b>referência</b> ${hexA(top.addr)}, que vai para R${op.r}.`;
+      break;
+    }
+    case 'ADDR': {
+      const base = op.base === 'var' ? COMP.vars[op.v].addr : s.regs[op.b].v;
+      const i = Number(s.regs[op.i].v), j = op.j != null ? Number(s.regs[op.j].v) : null;
+      const lin = j != null ? i * op.cols + j : i, a = base + op.off + lin * op.es;
+      s.regs[op.d] = {type:'addr', v:a}; ch.regs.add(op.d); ch.alu = true;
+      const A = COMP.vars[op.arr];
+      const f = `${hexA(base)}${op.off ? ' + ' + op.off : ''} + ${j != null ? `(${i}×${op.cols} + ${j})` : i}×${op.es}`;
+      s.alu = {sym:'&', text:`${f} = ${hexA(a)}`};
+      s.ttl = 'Cálculo do endereço';
+      const what = op.row ? `a referência da linha ${A.name}[${i}]` : j != null ? `${A.name}[${i}][${j}]` : `${A.name}[${i}]`;
+      if (op.base === 'var') s.msg = `Para achar ${what}, a CPU calcula: endereço de ${A.name} (${hexA(base)}) + ${j != null ? `(linha ${i} × ${op.cols} colunas + coluna ${j})` : `índice ${i}`} × ${op.es} bytes = <b>${hexA(a)}</b>. É por isso que o primeiro índice é 0: o índice é o <b>deslocamento</b> a partir do início.`;
+      else s.msg = `Para achar ${what}, a CPU soma à referência (${hexA(base)}) os ${op.off} bytes do cabeçalho e ${j != null ? `(${i} × ${op.cols} + ${j})` : i} × ${op.es} bytes: <b>${hexA(a)}</b>.`;
+      if (A.kind === 'arr') { const bad = i < 0 || i >= A.dims[0] || (j != null && (j < 0 || j >= A.dims[1])); if (bad) s.msg += ` <b>Atenção: índice fora do ${A.dims.length === 2 ? 'da matriz' : 'vetor'}!</b> Em ${L} ninguém confere: o endereço calculado aponta para fora de ${A.name}, para ${whatIs(s, a).txt}.`; }
+      break;
+    }
+    case 'CHK': {
+      const ref = s.regs[op.ref].v, i = Number(s.regs[op.i].v), j = op.j != null ? Number(s.regs[op.j].v) : null;
+      const len = Number(dec('int', rd(s, ref + 12, 4)));
+      const rows = op.j != null ? Number(dec('int', rd(s, ref + 16, 4))) : null, cols = op.j != null ? Number(dec('int', rd(s, ref + 20, 4))) : null;
+      const ok = j != null ? (i >= 0 && i < rows && j >= 0 && j < cols) : (i >= 0 && i < len);
+      ch.alu = true; s.ttl = 'Verificação de limites';
+      const A = COMP.vars[op.arr];
+      s.alu = {sym:'≤', text: j != null ? `0 ≤ ${i} < ${rows} e 0 ≤ ${j} < ${cols} ${ok ? '✓' : '✗'}` : `0 ≤ ${i} < ${len} ${ok ? '✓' : '✗'}`};
+      if (ok) s.msg = `Antes de acessar, a máquina virtual lê ${j != null ? 'o número de linhas e de colunas' : `o <b>length</b> do vetor${op.row ? '-linha' : ''} (${len})`} no heap e confere se o índice é válido: ${s.alu.text.replace(' ✓', '')}. Tudo certo.`;
+      else {
+        s.error = LANG === 'java' ? `Exception in thread "main" java.lang.ArrayIndexOutOfBoundsException: Index ${i} out of bounds for length ${len}` : 'Unhandled exception. System.IndexOutOfRangeException: Index was outside the bounds of the array.';
+        s.msg = `O índice ${j != null ? `[${i}, ${j}]` : i} está <b>fora dos limites</b> de ${A.name} (${j != null ? `${rows} × ${cols}` : `0 a ${len - 1}`}). ${L} confere todo acesso e lança uma exceção: o programa para aqui, sem estragar a memória.`;
+        s.out += s.error + '\n'; ch.out = true; s.halt = true;
+      }
+      break;
+    }
+    case 'LOADM': {
+      const a = s.regs[op.a].v, n = sizeOf(op.type), bytes = rd(s, a, n);
+      s.ttl = 'Leitura de elemento';
+      if (!bytes) { segv(s); s.msg = `O endereço ${hexA(a)} está fora da memória do programa: o sistema operacional interrompe o programa (segmentation fault).`; break; }
+      const v = dec(op.type, bytes); s.regs[op.r] = {type:op.type, v}; ch.regs.add(op.r);
+      s.acc = {addr:a, w:false};
+      const w = whatIs(s, a);
+      s.msg = op.type === 'ref' ? `A CPU lê em ${hexA(a)} a referência da linha: ${hexA(v)}. Agora sabe onde está o vetor-linha no heap.` : `A CPU lê ${n} byte${n > 1 ? 's' : ''} em ${hexA(a)} (${w.txt}) e coloca o valor <b>${rv(s.regs[op.r])}</b> em <b>R${op.r}</b>.`;
+      { const R = reg(s, a, n); if (R && R.c[R.i] === 'junk') s.msg += ' <b>Atenção:</b> esse elemento nunca recebeu valor: é lixo de memória.'; }
+      break;
+    }
+    case 'STOREM': {
+      const a = s.regs[op.a].v, R = s.regs[op.r];
+      s.ttl = 'Escrita de elemento';
+      if (!wr(s, a, enc(op.type, R.v))) { segv(s); s.msg = `O endereço ${hexA(a)} está fora da memória do programa: o sistema operacional interrompe o programa (segmentation fault).`; break; }
+      s.acc = {addr:a, w:true};
+      const w = whatIs(s, a);
+      s.msg = `O valor <b>${rv(R)}</b> de <b>R${op.r}</b> é gravado em ${hexA(a)}: <b>${w.txt}</b>.`;
+      if (w.key && w.key !== op.arr) { s.msg += ` <b>Cuidado!</b> Esse endereço não pertence a ${COMP.vars[op.arr].name}: o programa acabou de sobrescrever outra variável, sem nenhum aviso. Esse tipo de erro é difícil de achar.`; ch.vars.add(w.key); }
+      break;
+    }
+    case 'JF': {
+      const R = s.regs[op.r], t = R.type === 'bool' ? R.v : R.v !== 0n;
+      if (!t) s.pc = op.to;
+      s.ttl = op.kind === 'if' ? 'Decisão (if)' : `Teste do ${op.kind}`;
+      if (op.kind === 'if') s.msg = t ? `A condição <code>${esc(op.txt)}</code> é verdadeira: executa o bloco do if.` : `A condição <code>${esc(op.txt)}</code> é falsa: ${op.hasElse ? 'pula para o bloco do else' : 'pula o bloco do if'}.`;
+      else s.msg = t ? `A condição <code>${esc(op.txt)}</code> é verdadeira: executa o corpo do laço mais uma vez.` : `A condição <code>${esc(op.txt)}</code> é falsa: o laço termina e a execução continua depois dele.`;
+      break;
+    }
+    case 'JFK': case 'JTK': {
+      const R = s.regs[op.r], t = R.type === 'bool' ? R.v : R.v !== 0n, skip = op.t === 'JFK' ? !t : t;
+      if (skip) s.pc = op.to;
+      s.ttl = 'Curto-circuito';
+      s.msg = skip ? `<code>${esc(op.txt)}</code> já é ${t ? 'verdadeiro' : 'falso'}, então o resultado de <code>${op.t === 'JFK' ? '&amp;&amp;' : '||'}</code> já está decidido: o lado direito <b>nem é avaliado</b>. (É isso que evita acessar um índice inválido numa busca.)` : `<code>${esc(op.txt)}</code> é ${t ? 'verdadeiro' : 'falso'}: ainda é preciso avaliar o lado direito do <code>${op.t === 'JFK' ? '&amp;&amp;' : '||'}</code>.`;
+      break;
+    }
+    case 'JMP':
+      s.pc = op.to;
+      s.ttl = op.kind === 'else' ? 'Fim do if' : 'Volta do laço';
+      s.msg = op.kind === 'else' ? 'O bloco do if terminou: pula o bloco do else.' : op.kind === 'for' ? 'Fim de uma volta: depois do incremento, o for volta para testar a condição.' : 'Fim do corpo do while: volta para testar a condição.';
+      break;
+    case 'OUTV': { const R = s.regs[op.r], t = fmtOut(R.type, R.v); s.out += t + (op.nl ? '\n' : ''); ch.out = true; s.ttl = 'Saída'; s.msg = `<code>${OUTF[LANG]}</code> converte o valor de <b>R${op.r}</b> em texto e escreve “${esc(t)}” na tela.`; break; }
+    case 'OUTS': s.out += op.str + (op.nl ? '\n' : ''); ch.out = true; s.ttl = 'Saída'; s.msg = op.str ? `O texto “${esc(op.str)}” é escrito na tela.` : 'Uma quebra de linha é escrita na tela.'; break;
+    case 'END': s.halt = true; s.ttl = 'Fim'; s.msg = `${!J() ? '<code>return 0;</code> avisa ao sistema que deu tudo certo. ' : ''}A função termina e o quadro da pilha é liberado.${J() ? ' Os objetos do heap ficam para o coletor de lixo.' : ''}`; break;
+  }
+}
+function asmOf(op) {
+  if (!op) return '—';
+  const V = op.v && COMP.vars[op.v], ln = to => `linha ${opLine(COMP.ops[to]) + 1}`;
+  switch (op.t) {
+    case 'START': return 'CALL  main';
+    case 'END': return 'RET';
+    case 'ALLOC': return `ALLOC ${hexA(V.addr)}, ${V.size}    ; ${V.name}`;
+    case 'EXIT': return `ESCOPO-FIM ${op.keys.map(x => COMP.vars[x].name).join(', ')}`;
+    case 'LOADV': return `LOAD  R${op.r}, [${hexA(V.addr)}]  ; ${V.name}`;
+    case 'STORE': return `STORE [${hexA(V.addr)}], R${op.r}  ; ${V.name}`;
+    case 'LOADI': return `LOADI R${op.r}, ${op.disp}`;
+    case 'ALU': return `${MN[op.op]}${isInt(op.type) || op.cmp ? '' : '.F'}  R${op.d}, R${op.a}, R${op.b}`;
+    case 'NEG': return `NEG   R${op.r}`;
+    case 'NOT': return `NOT   R${op.r}`;
+    case 'CVT': return `CVT   R${op.r}, ${op.from}→${op.to}`;
+    case 'INITC': return `COPY  ${V.name}, {…}`;
+    case 'NEWARR': return `NEW   ${V.type}[${V.dims.join(V.shape === 'rect' ? ',' : '][')}] → R${op.r}`;
+    case 'ADDR': { const b = op.base === 'var' ? COMP.vars[op.v].name : `R${op.b}`; return `LEA   R${op.d}, [${b}${op.off ? '+' + op.off : ''} + ${op.j != null ? `(R${op.i}×${op.cols}+R${op.j})` : `R${op.i}`}×${op.es}]`; }
+    case 'CHK': return op.j != null ? `BOUND R${op.i}, R${op.j}, [R${op.ref}]` : `BOUND R${op.i}, [R${op.ref}+12]`;
+    case 'LOADM': return `LOAD  R${op.r}, [R${op.a}]`;
+    case 'STOREM': return `STORE [R${op.a}], R${op.r}`;
+    case 'JF': return `JF    R${op.r} → ${ln(op.to)}`;
+    case 'JFK': return `JF    R${op.r} → ${ln(op.to)} (&&)`;
+    case 'JTK': return `JT    R${op.r} → ${ln(op.to)} (||)`;
+    case 'JMP': return `JMP   → ${ln(op.to)}`;
+    case 'OUTV': return `OUT   R${op.r}`;
+    case 'OUTS': return `OUT   "${op.str.replace(/\n/g, '\\n')}"`;
+  }
+}
+
+/* ===================== desenho ===================== */
+const TY = new Set(['int','char','short','long','float','double','void','String','boolean','bool']);
+const KW = new Set(['return','public','static','class','using','namespace','for','while','if','else','new']);
+const FN = new Set(['printf','cout','endl','System','out','println','Console','WriteLine','main','Main']);
+function hl(s) {
+  if (/^\s*#/.test(s)) return `<span class="t-pp">${esc(s)}</span>`;
+  let o = '', m; const re = /(\/\/.*$)|(\$?"(?:\\.|[^"\\])*")|('(?:\\.|[^'\\])')|(\b\d[\w.]*)|([A-Za-z_]\w*)|([\s\S])/g;
+  while ((m = re.exec(s))) {
+    if (m[1]) o += `<span class="t-cm">${esc(m[1])}</span>`;
+    else if (m[2] || m[3]) o += `<span class="t-st">${esc(m[0])}</span>`;
+    else if (m[4]) o += `<span class="t-nu">${esc(m[4])}</span>`;
+    else if (m[5]) o += TY.has(m[5]) ? `<span class="t-ty">${m[5]}</span>` : KW.has(m[5]) ? `<span class="t-kw">${m[5]}</span>` : FN.has(m[5]) ? `<span class="t-fn">${m[5]}</span>` : m[5];
+    else o += esc(m[6]);
+  }
+  return o;
+}
+function drawCode() {
+  const errLine = COMP.errors.length ? (COMP.errors[0].si >= 0 ? CODE.stmtLine[COMP.errors[0].si] : -1) : -1;
+  $('code').innerHTML = CODE.lines.map((l, i) => `<div class="cl${i === errLine ? ' err' : ''}" id="cl-${i}"><span class="ln">${i + 1}</span><span>${hl(l)}</span></div>`).join('');
+  $('langName').textContent = LNAME[LANG] + ' · ' + {c:'main.c', cpp:'main.cpp', java:'Main.java', cs:'Program.cs'}[LANG];
+}
+function setCur(li) {
+  document.querySelectorAll('.cl.cur').forEach(e => e.classList.remove('cur'));
+  const el = $('cl-' + li); if (!el) return;
+  el.classList.add('cur');
+  const box = $('code'), t = el.offsetTop - box.offsetTop;
+  if (t < box.scrollTop + 20 || t > box.scrollTop + box.clientHeight - 40) box.scrollTop = t - box.clientHeight / 3;
+}
+const regType = r => r.type === 'ref' ? 'referência' : r.type === 'addr' ? 'endereço' : tname(r.type);
+function render(flash) {
+  const ch = flash && S.ch ? S.ch : {regs:new Set(), bytes:new Set(), vars:new Set(), objs:new Set()};
+  const ops = COMP.ops, last = k ? S.lastOp : null;
+  setCur(last ? opLine(last) : -1);
+  let h = '';
+  if (COMP.errors.length) {
+    const e = COMP.errors[0], ln = e.si >= 0 ? CODE.stmtLine[e.si] + 1 : '';
+    h = `<div class="ttl"><span class="tag" style="background:var(--bad)">Erro de compilação</span>${ln ? 'linha ' + ln : ''}</div><p>${e.msg}</p>${e.cc ? `<div class="msgs"><div class="msg e">Mensagem do compilador ${LNAME[LANG]}:<pre>${esc(e.cc)}</pre></div></div>` : ''}`;
+    if (J()) h += '<p style="margin-top:8px">Troque para C ou C++ para ver o que aconteceria nessas linguagens, ou edite o programa.</p>';
+  } else if (!k) {
+    h = `<div class="ttl"><span class="tag">Pronto</span></div><p>Clique em <b>Avançar</b> (ou use a seta →). <b>Por linha</b> executa uma linha do programa por vez; <b>Micro-passo</b> mostra cada operação da CPU, inclusive o cálculo do endereço de cada elemento. Dá para trocar a linguagem a qualquer momento: a execução continua do mesmo ponto.</p>`;
+  } else {
+    h = `<div class="ttl"><span class="tag"${S.error ? ' style="background:var(--bad)"' : ''}>${S.ttl}</span><span style="color:var(--mute);font-size:14px">linha ${opLine(last) + 1}</span></div><p>${S.msg}</p>`;
+    if (RUN.limit && k >= RUN.total) h += `<div class="msgs"><div class="msg w">O simulador parou depois de ${MAXSTEPS} passos: provavelmente o laço nunca termina.</div></div>`;
+  }
+  if (!COMP.errors.length && COMP.warnings.length) h += `<div class="msgs">${COMP.warnings.map(w => `<div class="msg w"><b>Aviso</b> (linha ${CODE.stmtLine[w.si] + 1}): ${w.msg}<pre>${esc(w.cc)}</pre></div>`).join('')}</div>`;
+  $('explain').innerHTML = h;
+  $('regs').innerHTML = S.regs.map((r, i) => `<div class="reg${r ? '' : ' empty'}${ch.regs.has(i) ? ' flash' : ''}" id="reg${i}"><div class="rn"><b>R${i}</b><span>${r ? regType(r) : 'vazio'}</span></div><div class="rv">${r ? esc(fmtVal(r.type, r.v)) : '—'}</div></div>`).join('');
+  $('aluShape').textContent = S.alu ? S.alu.sym : 'ULA';
+  $('aluTxt').innerHTML = S.alu ? `<small>última operação</small>${esc(S.alu.text)}` : '<small>Unidade Lógica e Aritmética</small>aguardando';
+  $('asmCur').textContent = last ? asmOf(last) : '—';
+  $('asmNext').textContent = COMP.errors.length || S.halt ? '—' : asmOf(ops[S.pc]);
+  $('out').innerHTML = esc(S.out) + '<span class="cur"></span>'; $('out').scrollTop = 1e6;
+  drawVis(); drawMem(ch);
+  $('cnt').textContent = `passo ${k} / ${COMP.errors.length ? 0 : RUN.total}`;
+  const dead = !!COMP.errors.length;
+  $('bReset').disabled = $('bBack').disabled = busy || k === 0;
+  $('bNext').disabled = $('bEnd').disabled = dead || busy || S.halt;
+  $('bPlay').disabled = dead || (S.halt && !playing);
+  $('playLbl').textContent = playing ? 'Pausar' : 'Executar';
+  $('playIco').innerHTML = playing ? '<path d="M6 5h4v14H6zM14 5h4v14h-4z"/>' : '<path d="M4 5v14l8-7zM12 5v14l8-7z"/>';
+  requestAnimationFrame(drawPtrs);
+}
+// valores de um vetor para a visão lógica: [{v, junk, addr}] em linhas
+function arrCells(v) {
+  const R = v.dims.length === 2 ? v.dims[0] : 1, C = v.dims.length === 2 ? v.dims[1] : v.dims[0], rows = [];
+  const cell = (a, t) => { const R_ = reg(S, a, sizeOf(t)); if (!R_) return {v:'?', junk:true, addr:a}; return {v:dec(t, R_.m.slice(R_.i, R_.i + sizeOf(t))), junk:R_.c[R_.i] === 'junk', addr:a}; };
+  if (v.kind === 'arr') { for (let i = 0; i < R; i++) { const r = []; for (let j = 0; j < C; j++) r.push(cell(v.addr + (i * C + j) * v.es, v.type)); rows.push(r); } return rows; }
+  if (!S.init.has(v.key)) return null;
+  const ref = readVar(S, v); if (!ref || !objAt(S, ref)) return null;
+  for (let i = 0; i < R; i++) {
+    const r = [];
+    if (v.shape === '1d') for (let j = 0; j < C; j++) r.push(cell(ref + 16 + j * v.es, v.type));
+    else if (v.shape === 'rect') for (let j = 0; j < C; j++) r.push(cell(ref + 24 + (i * C + j) * v.es, v.type));
+    else { const ra = dec('ref', rd(S, ref + 16 + i * REFSZ(), REFSZ())); for (let j = 0; j < C; j++) r.push(cell(ra + 16 + j * v.es, v.type)); }
+    rows.push(r);
+  }
+  return rows;
+}
+function markers(v, d) {
+  const u = COMP.idxUse[v.key]; if (!u) return [];
+  return [...u[d]].map(kk => COMP.vars[kk]).filter(x => x && x.kind === 'scalar' && S.alloc.has(x.key) && !S.dead.has(x.key) && S.init.has(x.key) && isInt(x.type)).map(x => ({name:x.name, val:Number(readVar(S, x))}));
+}
+function drawVis() {
+  const arrs = COMP.order.filter(v => v.kind !== 'scalar' && S.alloc.has(v.key) && !S.dead.has(v.key));
+  if (!arrs.length) { $('vis').innerHTML = '<div class="empty-note">Os vetores e as matrizes aparecem aqui assim que forem declarados.</div>'; return; }
+  $('vis').innerHTML = arrs.map(v => {
+    const rows = arrCells(v);
+    const head = `<div class="lvh"><b>${v.name}</b><span>${tname(v.type)}${v.dims.map(d => `[${d}]`).join('')} · ${v.dims.length === 2 ? `${v.dims[0]} linhas × ${v.dims[1]} colunas` : `${v.dims[0]} elementos`}${v.kind === 'ref' ? ' · no heap' : ' · na pilha'}</span></div>`;
+    if (!rows) return `<div class="lv" style="--c:${v.color}">${head}<div class="empty-note">ainda sem objeto</div></div>`;
+    const cellH = (c, i, j) => {
+      const acc = S.acc && S.acc.addr === c.addr ? (S.acc.w ? ' acc-w' : ' acc-r') : '';
+      const txt = c.junk ? `<span title="lixo de memória">${esc(num(v.type, c.v))}</span>` : esc(num(v.type, c.v) + (v.type === 'char' ? glyph(c.v) : ''));
+      return `<div class="lc${c.junk ? ' junk' : ''}${acc}" ${v.dims.length === 2 ? `style="--t:${ROWT[i % ROWT.length]}"` : ''}>${txt}</div>`;
+    };
+    if (v.dims.length === 1) {
+      const N = v.dims[0], mk = markers(v, 0), cols = {};
+      mk.forEach(m => { const c = m.val < 0 ? 0 : m.val >= N ? N + 1 : m.val + 1; (cols[c] = cols[c] || []).push(m); });
+      let g = `<div class="lg" style="grid-template-columns:repeat(${N + 2},minmax(50px,auto))">`;
+      for (let c = 0; c < N + 2; c++) g += `<div class="mks">${(cols[c] || []).map(m => `<span class="mk${c === 0 || c === N + 1 ? ' oob' : ''}">${m.name}${c === 0 || c === N + 1 ? '=' + m.val : ''} ▾</span>`).join('')}</div>`;
+      g += '<div></div>' + rows[0].map((c, j) => cellH(c, 0, j)).join('') + '<div></div>';
+      g += '<div></div>' + rows[0].map((_, j) => `<div class="li">[${j}]</div>`).join('') + '<div></div></div>';
+      return `<div class="lv" style="--c:${v.color}">${head}${g}</div>`;
+    }
+    const [R, C] = v.dims, mr = markers(v, 0), mc = markers(v, 1), oob = [];
+    let g = `<div class="lg" style="grid-template-columns:auto 34px repeat(${C},minmax(50px,auto))"><div></div><div></div>`;
+    for (let j = 0; j < C; j++) g += `<div class="mks">${mc.filter(m => m.val === j).map(m => `<span class="mk">${m.name} ▾</span>`).join('')}</div>`;
+    g += '<div></div><div></div>' + Array.from({length:C}, (_, j) => `<div class="li">[${j}]</div>`).join('');
+    rows.forEach((r, i) => { g += `<div class="mks row">${mr.filter(m => m.val === i).map(m => `<span class="mk">${m.name} ▸</span>`).join('')}</div><div class="li" style="align-self:center">[${i}]</div>` + r.map((c, j) => cellH(c, i, j)).join(''); });
+    g += '</div>';
+    mr.concat(mc).forEach((m, x) => { const lim = x < mr.length ? R : C; if (m.val < 0 || m.val >= lim) oob.push(`${m.name} = ${m.val}`); });
+    return `<div class="lv" style="--c:${v.color}">${head}${g}${oob.length ? `<div class="vnote">fora da matriz: ${oob.join(', ')}</div>` : ''}</div>`;
+  }).join('');
+}
+function reachable() {
+  const ok = new Set();
+  COMP.order.forEach(v => { if (v.kind === 'ref' && S.alloc.has(v.key) && !S.dead.has(v.key) && S.init.has(v.key)) { const o = objAt(S, readVar(S, v)); if (o) ok.add(o.id); } });
+  S.objs.forEach(o => { if (o.kind === 'refs' && ok.has(o.id)) for (let i = 0; i < o.len; i++) { const r = objAt(S, dec('ref', rd(S, o.addr + 16 + i * o.es, o.es))); if (r) ok.add(r.id); } });
+  return ok;
+}
+function drawGrid(el, base, mem, cells, blocks, ch) {
+  const N = mem.length, at = new Array(N).fill(null), cw = BASE === 'bin' ? 54 : 46, bpr = el.clientWidth >= 72 + 16 * cw ? 16 : 8;
+  blocks.forEach(b => b.parts.forEach((p, pi) => { for (let a = p.start; a < p.start + p.size; a++) if (a - base >= 0 && a - base < N) at[a - base] = {b, p, pi}; }));
+  const cell = i => {
+    const st = cells[i], a = base + i;
+    const txt = st === 'free' ? '··' : st === 'unk' ? '?' : st === 'pad' || st === 'hdr' ? '' : byteStr(mem[i]);
+    return `<div class="cell ${st}${ch.bytes.has(a) ? ' flash' : ''}" id="c-${a}"><small>${hx(a, 4)}</small><b>${txt}</b></div>`;
+  };
+  const seen = new Set(), seenP = new Set();
+  let h = '';
+  for (let r = 0; r < Math.ceil(N / bpr); r++) {
+    h += `<div class="mrow"><div class="maddr">${hexA(base + r * bpr)}</div><div class="cells">`;
+    let i = r * bpr; const end = Math.min(N, r * bpr + bpr);
+    while (i < end) {
+      const x = at[i];
+      if (!x) { h += cell(i); i++; continue; }
+      const b = x.b, first = !seen.has(b.id); seen.add(b.id);
+      h += `<div class="vb${b.cls ? ' ' + b.cls : ''}${first && b.appear ? ' appear' : ''}" style="--c:${b.color}"${first ? ` id="blk-${b.id}"` : ''}>${first ? `<span class="vlab">${esc(b.label)}<em>${esc(b.sub)}</em></span>` : ''}`;
+      while (i < end && at[i] && at[i].b === b) {
+        const p = at[i].p, pk = b.id + ':' + at[i].pi, pf = !seenP.has(pk); seenP.add(pk);
+        h += `<div class="pt"${p.tint ? ` style="--t:${p.tint}"` : ''}${pf ? ` id="pa-${p.start}"` : ''}>${pf && p.lab ? `<span class="ix">${esc(p.lab)}</span>` : ''}`;
+        while (i < end && at[i] && at[i].p === p) { h += cell(i); i++; }
+        h += '</div>';
+      }
+      h += '</div>';
+    }
+    h += '</div></div>';
+  }
+  el.className = 'mem b-' + BASE; el.innerHTML = h;
+}
+function drawMem(ch) {
+  document.querySelector('main').classList.toggle('jl', J());
+  const blocks = COMP.order.filter(v => S.alloc.has(v.key)).map(v => {
+    const dead = S.dead.has(v.key);
+    let parts;
+    if (v.kind === 'arr') { const C = v.dims[1] || 1, n = v.dims[0] * C; parts = Array.from({length:n}, (_, x) => ({start:v.addr + x * v.es, size:v.es, lab: v.dims.length === 2 ? `[${Math.floor(x / C)}][${x % C}]` : `[${x}]`, tint: v.dims.length === 2 ? ROWT[Math.floor(x / C) % ROWT.length] : null})); }
+    else parts = [{start:v.addr, size:v.size}];
+    return {id:'v-' + v.key, color:v.color, label:v.name, sub: v.kind === 'ref' ? `referência ${tname(v.type)}${v.shape === 'rect' ? '[,]' : v.dims.map(() => '[]').join('')}` : v.kind === 'arr' ? `${tname(v.type)}${v.dims.map(d => `[${d}]`).join('')}` : tname(v.type) + (dead ? ' (fora de escopo)' : ''), parts, cls: dead ? 'dead' : '', appear: ch.vars.has(v.key) && S.lastOp && S.lastOp.t === 'ALLOC'};
+  });
+  drawGrid($('stack'), SB, S.stack, S.scell, blocks, ch);
+  $('stackInfo').textContent = `${S.stack.length} bytes a partir de ${hexA(SB)}`;
+  if (!J()) { $('heap').innerHTML = `<div class="empty-note">Vazio. Em ${LNAME[LANG]}, vetores e matrizes declarados dentro da função ficam inteiros na pilha; o heap só seria usado com ${LANG === 'c' ? '<code>malloc</code>' : '<code>new</code>'}. Troque para Java ou C# para ver a diferença.</div>`; $('heapInfo').textContent = ''; return; }
+  if (!S.objs.length) { $('heap').innerHTML = '<div class="empty-note">Nenhum objeto criado ainda. Em Java e C#, cada vetor é criado aqui, no heap.</div>'; $('heapInfo').textContent = ''; return; }
+  const live = reachable();
+  const hb = S.objs.map(o => {
+    const parts = [{start:o.addr, size:12, lab:'cabeçalho'}, {start:o.addr + 12, size:4, lab: o.kind === 'rect' ? 'length' : 'length'}];
+    if (o.kind === 'rect') parts.push({start:o.addr + 16, size:4, lab:'linhas'}, {start:o.addr + 20, size:4, lab:'colunas'});
+    for (let x = 0; x < o.len; x++) parts.push({start:o.addr + o.hdr + x * o.es, size:o.es, lab: o.kind === 'rect' ? `[${Math.floor(x / o.cols)},${x % o.cols}]` : `[${x}]`, tint: o.kind === 'rect' ? ROWT[Math.floor(x / o.cols) % ROWT.length] : o.row != null ? ROWT[o.row % ROWT.length] : null});
+    const lab = o.kind === 'refs' ? `${o.owner}: vetor de linhas` : o.row != null ? `${o.owner}[${o.row}]` : o.owner;
+    const sub = o.kind === 'refs' ? `${o.len} referências` : o.kind === 'rect' ? `${tname(o.et)}[${o.rows}, ${o.cols}]` : `${tname(o.et)}[${o.len}]`;
+    return {id:'o-' + o.id, color:o.color, label:lab, sub: sub + (live.has(o.id) ? '' : ' · sem referência'), parts, cls: live.has(o.id) ? '' : 'dead', appear: ch.objs.has(o.id)};
+  });
+  const NH = Math.ceil(S.heap.length / 8) * 8 + 8, hm = S.heap.slice(), hc = S.hcell.slice();
+  while (hm.length < NH) { hm.push(0); hc.push('free'); }
+  drawGrid($('heap'), HB, hm, hc, hb, ch);
+  $('heapInfo').textContent = `${S.objs.length} objeto${S.objs.length > 1 ? 's' : ''} · a partir de ${hexA(HB)}`;
+}
+function drawPtrs() {
+  const svg = $('ptrs'), W = document.documentElement.scrollWidth, H = document.documentElement.scrollHeight;
+  svg.setAttribute('width', W); svg.setAttribute('height', H);
+  if (!S || !J() || COMP.errors.length) { svg.innerHTML = ''; return; }
+  const pairs = [];
+  COMP.order.forEach(v => { if (v.kind === 'ref' && S.alloc.has(v.key) && !S.dead.has(v.key) && S.init.has(v.key)) { const o = objAt(S, readVar(S, v)); if (o) pairs.push([$('blk-v-' + v.key), $('blk-o-' + o.id), v.color]); } });
+  S.objs.forEach(o => { if (o.kind === 'refs') for (let i = 0; i < o.len; i++) { const t = objAt(S, dec('ref', rd(S, o.addr + 16 + i * o.es, o.es))); if (t) pairs.push([$('pa-' + (o.addr + 16 + i * o.es)), $('blk-o-' + t.id), o.color]); } });
+  const sx = scrollX, sy = scrollY;
+  let h = '<defs>' + PAL.map((c, i) => `<marker id="ah${i}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="${c}"/></marker>`).join('') + '</defs>';
+  pairs.forEach(([a, b, c]) => {
+    if (!a || !b) return;
+    const A = a.getBoundingClientRect(), B = b.getBoundingClientRect();
+    let x1, y1, x2, y2, path;
+    if (B.left > A.right + 20) { x1 = A.right + sx; y1 = A.top + A.height / 2 + sy; x2 = B.left + sx - 2; y2 = B.top + Math.min(22, B.height / 2) + sy; const dx = Math.max(40, (x2 - x1) / 2); path = `M${x1} ${y1}C${x1 + dx} ${y1} ${x2 - dx} ${y2} ${x2} ${y2}`; }
+    else { x1 = A.left + A.width / 2 + sx; y1 = A.bottom + sy + 14; x2 = B.left + 18 + sx; y2 = B.top + sy - 20; const dy = Math.max(30, Math.abs(y2 - y1) / 2); path = `M${x1} ${y1}C${x1} ${y1 + dy} ${x2} ${y2 - dy} ${x2} ${y2}`; }
+    h += `<circle cx="${x1}" cy="${y1}" r="3.5" fill="${c}"/><path d="${path}" fill="none" stroke="${c}" stroke-width="2.2" stroke-opacity=".85" marker-end="url(#ah${PAL.indexOf(c)})"/>`;
+  });
+  svg.innerHTML = h;
+}
+let rsT; addEventListener('resize', () => { clearTimeout(rsT); rsT = setTimeout(() => { if (S && !busy) render(false); else drawPtrs(); }, 120); });
+document.addEventListener('scroll', () => requestAnimationFrame(drawPtrs), true);
+
+/* ===================== animação e controle ===================== */
+const MULT = [0, .45, .7, 1, 1.6, 2.6];
+const RM = matchMedia('(prefers-reduced-motion: reduce)');
+const dur = () => RM.matches ? 0 : 650 / MULT[+$('spd').value];
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+function fly(from, to, text, color, f = 1) {
+  const d = dur() * f; if (!d || !from || !to) return Promise.resolve();
+  const a = from.getBoundingClientRect(), b = to.getBoundingClientRect();
+  const c = document.createElement('div'); c.className = 'chip'; c.textContent = text;
+  if (color) c.style.setProperty('--cc', color);
+  document.body.appendChild(c);
+  const w = c.offsetWidth, h = c.offsetHeight;
+  const x0 = a.left + a.width / 2 - w / 2, y0 = a.top + a.height / 2 - h / 2, x1 = b.left + b.width / 2 - w / 2, y1 = b.top + b.height / 2 - h / 2;
+  const an = c.animate([{transform:`translate(${x0}px,${y0}px) scale(.6)`, opacity:0}, {transform:`translate(${x0}px,${y0}px) scale(1)`, opacity:1, offset:.18}, {transform:`translate(${x1}px,${y1}px) scale(1)`, opacity:1, offset:.92}, {transform:`translate(${x1}px,${y1}px) scale(.8)`, opacity:0}], {duration:d * 1.25, easing:'ease-in-out'});
+  return an.finished.then(() => c.remove(), () => c.remove());
+}
+const pulse = el => { if (!el || !dur()) return; el.classList.remove('pulse'); void el.offsetWidth; el.classList.add('pulse'); };
+const partEl = a => $('pa-' + a) || $('c-' + a);
+async function animate(op, f = 1) {
+  const R = i => $('reg' + i), alu = $('aluShape'), line = $('cl-' + opLine(op)), V = op.v && COMP.vars[op.v];
+  const vt = r => r ? fmtVal(r.type, r.v) : '?';
+  switch (op.t) {
+    case 'LOADV': await fly($('blk-v-' + op.v), R(op.r), fmtVal(V.kind === 'ref' ? 'ref' : V.type, readVar(S, V)), V.color, f); break;
+    case 'STORE': await fly(R(op.r), $('blk-v-' + op.v), vt(S.regs[op.r]), V.color, f); break;
+    case 'LOADI': await fly(line, R(op.r), fmtVal(op.type, op.value), null, f); break;
+    case 'ALU': case 'NEG': case 'NOT': case 'ADDR': case 'CHK': {
+      const ins = [];
+      if (op.t === 'ALU') ins.push(fly(R(op.a), alu, vt(S.regs[op.a]), null, f), fly(R(op.b), alu, vt(S.regs[op.b]), null, f));
+      else if (op.t === 'ADDR') { ins.push(op.base === 'var' ? fly($('blk-v-' + op.v), alu, hexA(COMP.vars[op.v].addr), COMP.vars[op.v].color, f) : fly(R(op.b), alu, vt(S.regs[op.b]), null, f)); ins.push(fly(R(op.i), alu, vt(S.regs[op.i]), null, f)); if (op.j != null) ins.push(fly(R(op.j), alu, vt(S.regs[op.j]), null, f)); }
+      else if (op.t === 'CHK') { const ref = S.regs[op.ref].v; ins.push(fly(partEl(ref + 12), alu, 'length ' + Number(dec('int', rd(S, ref + 12, 4))), null, f), fly(R(op.i), alu, vt(S.regs[op.i]), null, f)); }
+      else ins.push(fly(R(op.r), alu, vt(S.regs[op.r]), null, f));
+      await Promise.all(ins);
+      const tmp = cloneS(S); applyOp(tmp);
+      if (tmp.alu) { $('aluShape').textContent = tmp.alu.sym; $('aluTxt').innerHTML = `<small>calculando…</small>${esc(tmp.alu.text)}`; }
+      pulse(alu); await sleep(dur() * .55 * f);
+      if (!tmp.error && op.t !== 'CHK') { const d = op.t === 'ALU' || op.t === 'ADDR' ? op.d : op.r; await fly(alu, R(d), vt(tmp.regs[d]), null, f); }
+      break;
+    }
+    case 'CVT': pulse(R(op.r)); await sleep(dur() * .5 * f); break;
+    case 'LOADM': { const a = S.regs[op.a].v, R_ = reg(S, a, sizeOf(op.type)); await fly(partEl(a), R(op.r), R_ ? fmtVal(op.type, dec(op.type, R_.m.slice(R_.i, R_.i + sizeOf(op.type)))) : '?', null, f); break; }
+    case 'STOREM': await fly(R(op.r), partEl(S.regs[op.a].v), vt(S.regs[op.r]), null, f); break;
+    case 'NEWARR': await fly(line, J() ? $('heap') : $('stack'), `new ${V.type}[…]`, V.color, f); break;
+    case 'INITC': await fly(line, $('blk-v-' + op.v), '{ … }', V.color, f); break;
+    case 'JF': case 'JFK': case 'JTK': pulse(R(op.r)); await sleep(dur() * .45 * f); break;
+    case 'OUTV': await fly(R(op.r), $('out'), fmtOut(S.regs[op.r].type, S.regs[op.r].v), null, f); break;
+    case 'OUTS': await fly(line, $('out'), '"' + op.str.replace(/\n/g, '\\n') + '"', null, f); break;
+    default: await sleep(dur() * .25 * f);
+  }
+}
+const KEYOPS = new Set(['LOADM','STOREM','NEWARR','INITC','OUTV','OUTS','STORE']);
+function exec1() { const op = COMP.ops[S.pc]; S.lastOp = op; applyOp(S); k++; }
+function mergeCh(a, b) { if (!a) return b; ['regs','bytes','vars','objs'].forEach(f => b[f].forEach(x => a[f].add(x))); a.alu = a.alu || b.alu; a.out = a.out || b.out; return a; }
+const nextBound = () => RUN.bounds.find(b => b > k) ?? RUN.total;
+async function step() {
+  if (busy || COMP.errors.length || S.halt) return;
+  busy = true;
+  if (MODE === 'micro') { const op = COMP.ops[S.pc]; setCur(opLine(op)); try { await animate(op); } catch (e) {} exec1(); }
+  else {
+    const target = nextBound(); let acc = null;
+    setCur(opLine(COMP.ops[S.pc]));
+    while (k < target && !S.halt) {
+      const op = COMP.ops[S.pc];
+      if (KEYOPS.has(op.t) && dur()) { try { await animate(op, .55); } catch (e) {} }
+      exec1(); acc = mergeCh(acc, S.ch);
+      if (KEYOPS.has(op.t) && dur()) { const c = S.ch; S.ch = acc; render(false); S.ch = c; }
+    }
+    S.ch = acc;
+  }
+  busy = false; render(true);
+}
+function go(n) {
+  playing = false;
+  S = newState(); k = 0; S.lastOp = null;
+  if (!COMP.errors.length) while (k < n && !S.halt) exec1();
+  render(false);
+}
+function back() {
+  if (busy || !k) return;
+  if (MODE === 'micro') return go(k - 1);
+  let t = 0; for (const b of RUN.bounds) if (b < k) t = b;
+  go(t);
+}
+async function play() {
+  if (playing) { playing = false; render(false); return; }
+  if (S.halt) return;
+  playing = true; render(false);
+  while (playing && !S.halt) { await step(); if (playing) await sleep(dur() * .4 + 80); }
+  playing = false; render(false);
+}
+function fullRun() {
+  const s = newState(); const save_ = S; let n = 0, lastG = null; const bounds = [];
+  while (!s.halt && n < MAXSTEPS) { const op = COMP.ops[s.pc]; if (op.g !== lastG && n > 0) bounds.push(n); lastG = op.g; applyOp(s); n++; }
+  bounds.push(n);
+  return {total:n, bounds:[...new Set(bounds)], limit:!s.halt};
+}
+function rebuild(keep) {
+  AST = parseSource(SRC);
+  COMP = compile(AST); CODE = codegen(AST);
+  RUN = COMP.errors.length ? {total:0, bounds:[0], limit:false} : fullRun();
+  drawCode(); go(keep ? Math.min(k, RUN.total) : 0);
+}
+
+/* ===================== interface ===================== */
+function seg(id, items, get, set) {
+  const el = $(id);
+  const draw = () => el.innerHTML = items.map(([v, l]) => `<button data-v="${v}" aria-pressed="${get() === v}">${l}</button>`).join('');
+  el.addEventListener('click', e => { const b = e.target.closest('button'); if (!b || busy) return; set(b.dataset.v); draw(); save(); });
+  draw();
+}
+const shapeVis = () => $('shapeFld').classList.toggle('hid', LANG !== 'cs');
+seg('langSeg', [['c','C'], ['cpp','C++'], ['java','Java'], ['cs','C#']], () => LANG, v => { LANG = v; shapeVis(); rebuild(true); });
+seg('shapeSeg', [['rect','<code>int[,]</code>'], ['jag','<code>int[][]</code>']], () => CSRECT ? 'rect' : 'jag', v => { CSRECT = v === 'rect'; rebuild(true); });
+seg('baseSeg', [['bin','Bin'], ['dec','Dec'], ['hex','Hex']], () => BASE, v => { BASE = v; render(false); });
+const ms = $('modeSeg');
+const drawMode = () => ms.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', b.dataset.v === MODE));
+ms.addEventListener('click', e => { const b = e.target.closest('button'); if (!b || busy) return; MODE = b.dataset.v; drawMode(); save(); });
+drawMode(); shapeVis();
+const exSel = $('exSel');
+const drawEx = () => { exSel.innerHTML = EX.map((e, i) => `<option value="${i}">${esc(e.n)}</option>`).join('') + (exIdx < 0 ? '<option value="-1">Programa personalizado</option>' : ''); exSel.value = exIdx; };
+drawEx();
+exSel.addEventListener('change', () => { if (busy) { exSel.value = exIdx; return; } exIdx = +exSel.value; if (exIdx >= 0) SRC = EX[exIdx].s; drawEx(); save(); rebuild(false); });
+$('bNext').onclick = step;
+$('bBack').onclick = back;
+$('bReset').onclick = () => { if (!busy) go(0); };
+$('bEnd').onclick = () => { if (!busy) go(RUN.total); };
+$('bPlay').onclick = play;
+document.addEventListener('keydown', e => {
+  if ($('ov').classList.contains('on') || (/INPUT|SELECT|TEXTAREA|BUTTON/.test(e.target.tagName) && e.key === ' ')) return;
+  if (e.key === 'ArrowRight') { e.preventDefault(); step(); }
+  else if (e.key === 'ArrowLeft') { e.preventDefault(); back(); }
+  else if (e.key === ' ') { e.preventDefault(); play(); }
+  else if (e.key === 'Home') $('bReset').onclick();
+  else if (e.key === 'End') $('bEnd').onclick();
+});
+const ov = $('ov'), ed = $('ed');
+$('editBtn').onclick = () => { if (busy) return; playing = false; ed.value = SRC; $('perr').textContent = ''; ov.classList.add('on'); ed.focus(); };
+$('edCancel').onclick = () => ov.classList.remove('on');
+ov.addEventListener('keydown', e => { if (e.key === 'Escape') ov.classList.remove('on'); if (e.key === 'Tab' && e.target === ed) { e.preventDefault(); ed.setRangeText('    ', ed.selectionStart, ed.selectionEnd, 'end'); } });
+$('edOk').onclick = () => {
+  try { parseSource(ed.value); } catch (e) { $('perr').textContent = `Linha ${e.line || '?'}: ${e.message}`; return; }
+  SRC = ed.value; exIdx = EX.findIndex(x => x.s === SRC); drawEx(); save();
+  ov.classList.remove('on'); rebuild(false);
+};
+try { rebuild(false); } catch (e) { SRC = EX[0].s; exIdx = 0; drawEx(); rebuild(false); }
+}
+</script>
+</body>
+</html>
