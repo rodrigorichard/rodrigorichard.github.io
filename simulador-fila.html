@@ -1,0 +1,707 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Simulador de Fila</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+/* VOICE: material de aula da PUC Minas — mesmo padrão do Simulador de ABP.
+   IDEA: o teste de mesa da CFila: Main e classe à esquerda, memória (pilha e heap) à direita.
+   PICTURE: o desenho da memória, com a fila encadeada, a célula cabeça e as referências.
+   COLOUR and TYPE: azul-marinho e dourado do template das aulas; laranja para o que está acontecendo agora.
+   LAYOUT: barra de comandos do Main, palco com código e memória, player e legenda. */
+:root{color-scheme:light dark;
+ --bg:light-dark(#f6f7f9,#0e1522);--card:light-dark(#fff,#16202f);--ink:light-dark(#18202b,#e6ebf2);--mute:light-dark(#5b6573,#9aa6b6);
+ --navy:#0b2d5b;--navyink:light-dark(#0b2d5b,#a9c3e8);--gold:#c9a227;--line:light-dark(#d9dfe8,#2a3647);
+ --no:light-dark(#e8eef7,#1d2c44);--noborda:light-dark(#0b2d5b,#7fa3d6);
+ --lar:#d9822b;--larcl:light-dark(#fcebd9,#3a2a16);--verde:#2e7d4f;--verdecl:light-dark(#dff2e6,#173323);
+ --verm:#b3261e;--vermcl:light-dark(#fcedec,#3b1a18);--roxo:light-dark(#6b3fa0,#b48fe0);
+ --codebg:light-dark(#f3f5f8,#101826);--cabeca:light-dark(#cfd7e2,#34404f);
+ --f-body:"Source Sans 3",system-ui,sans-serif;--f-mono:"JetBrains Mono",Consolas,monospace}
+:root[data-theme=light]{color-scheme:light}:root[data-theme=dark]{color-scheme:dark}
+*{box-sizing:border-box;min-width:0}
+[hidden]{display:none!important}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 var(--f-body);overflow-x:clip}
+header{background:var(--navy);color:#fff;border-bottom:4px solid var(--gold);padding:14px max(3vw,14px)}
+header h1{margin:0;font-size:clamp(22px,3vw,30px);line-height:1.1}
+header p{margin:4px 0 0;color:#c8d6ea;font-size:15px}
+header a{color:#fff}
+main{padding:14px max(3vw,14px) 40px;max-width:1500px;margin:auto}
+code,kbd{font-family:var(--f-mono);font-size:.9em}
+:not(pre)>code{background:var(--no);padding:1px 5px;border-radius:4px}
+kbd{border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:0 5px;background:var(--card)}
+.ops{display:flex;flex-wrap:wrap;gap:8px 10px;align-items:center;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+.ops .lb{font-size:14px;color:var(--mute);margin-right:4px}
+.chip{font:600 14px var(--f-mono);min-height:36px;padding:4px 11px;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer}
+.chip:hover{border-color:var(--navyink)}
+.chip.on{background:var(--navy);color:#fff;border-color:var(--navy)}
+button,select{font:600 15px var(--f-body);min-height:40px;padding:6px 12px;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer}
+button:hover{border-color:var(--navyink)}
+button.pri{background:var(--navy);color:#fff;border-color:var(--navy)}
+button.pri:hover{background:#123f7d}
+button:focus-visible,select:focus-visible,input:focus-visible,.chip:focus-visible{outline:3px solid var(--gold);outline-offset:1px}
+button:disabled{opacity:.45;cursor:default}
+.dica{margin:6px 2px 0;font-size:14px;color:var(--mute)}
+.palco{display:grid;grid-template-columns:minmax(0,5fr) minmax(0,7fr);gap:14px;margin-top:14px;align-items:start}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.tit{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--line);font-weight:700;color:var(--navyink);font-size:15px}
+.tit small{font-weight:400;color:var(--mute)}
+/* código */
+.codigo{background:var(--codebg);font:13px/1.62 var(--f-mono);overflow:auto;padding:6px 0}
+.codigo .ln{display:flex;white-space:pre;padding-right:12px;min-width:max-content;border-left:4px solid transparent}
+.codigo .ln .num{width:2.8em;flex:none;text-align:right;padding-right:12px;color:var(--mute);opacity:.6;user-select:none}
+.codigo .ln.atual{background:var(--larcl);border-left-color:var(--lar)}
+.codigo .ln.atual-parcial{border-left-color:var(--lar)}
+.codigo .ln.espera{background:var(--no);border-left-color:var(--noborda)}
+.codigo .parte-on{background:var(--larcl);border-radius:3px;outline:1.5px solid var(--lar)}
+#codFila{max-height:380px}
+.t-kw{color:light-dark(#0b2d5b,#8fb5ec);font-weight:600}.t-ty{color:light-dark(#00707a,#5fd3d9)}.t-str{color:light-dark(#9a5a12,#e0a45a)}
+.t-num{color:light-dark(#1750eb,#9ab8ff)}.t-cm{color:var(--verde);font-style:italic}
+/* memória */
+.memoria{background:var(--card);overflow-x:auto}
+.memoria svg{display:block;width:100%;min-width:560px;height:auto}
+.nota{margin:10px 12px;padding:9px 12px;border-radius:8px;background:var(--larcl);border-left:4px solid var(--lar);min-height:44px}
+.nota code{background:none;padding:0}
+.pare{margin:0 12px 10px;border:2px solid var(--gold);border-radius:8px;padding:10px 12px;display:flex;flex-direction:column;gap:8px;background:light-dark(#fdf8e6,#2a2412)}
+.pare .titulo{font-weight:700;color:light-dark(#7a6110,#e6c55a);font-size:14px}
+.pare .resposta{border-top:1px dashed var(--line);padding-top:8px}
+.telab{padding:4px 12px 12px}
+.telab h3{margin:0 0 6px;font:700 13px var(--f-body);color:var(--mute)}
+.console{background:#111b27;color:#7ee2a0;font:14px var(--f-mono);padding:8px 10px;border-radius:6px;min-height:7em;white-space:pre-wrap;margin:0}
+.console .cursor{display:inline-block;width:.55em;height:1.05em;vertical-align:text-bottom;background:#7ee2a0;opacity:.7}
+/* SVG */
+svg text{font-family:var(--f-mono);fill:var(--ink)}
+svg .rot{font-size:11.5px;fill:var(--mute);font-family:var(--f-body);font-weight:700}
+svg .quadro{fill:var(--card);stroke:var(--line);stroke-width:1.2}
+svg .quadro-titulo{font-size:12px;font-weight:600;fill:var(--navyink)}
+svg .nome{font-size:13px}
+svg .caixa{fill:var(--card);stroke:var(--noborda);stroke-width:1.4}
+svg .vtxt{font-size:13px;text-anchor:middle;dominant-baseline:central}
+svg .vtxt.fraco{fill:var(--mute)}
+svg .addr{font-size:10.5px;fill:var(--roxo)}
+svg .obj{fill:var(--card);stroke:var(--noborda);stroke-width:2}
+svg .cel-item{fill:var(--card);stroke:var(--noborda);stroke-width:2}
+svg .cel-prox{fill:var(--no);stroke:var(--noborda);stroke-width:2}
+svg .cel-item.cabeca{fill:var(--cabeca)}
+svg .lixo{opacity:.32}
+svg .halo{paint-order:stroke;stroke:var(--card);stroke-width:4px;stroke-linejoin:round}
+svg .tag{font-size:11.5px;font-family:var(--f-body);font-weight:700;text-anchor:middle}
+svg .tag.cab{fill:var(--lar)}
+svg .tag.lix{fill:var(--verm)}
+svg .seta{fill:none;stroke:var(--navyink);stroke-width:2}
+svg .seta.this{stroke:var(--roxo);stroke-dasharray:5 3}
+svg .seta.aux{stroke:var(--lar);stroke-width:2.4}
+svg .ponto{fill:var(--navyink)}
+svg .ponto.this{fill:var(--roxo)}
+svg .ponto.aux{fill:var(--lar)}
+svg .terra{stroke:var(--noborda);stroke-width:2;fill:none}
+svg .foco{fill:none;stroke:var(--lar);stroke-width:3}
+svg .vazio{font-size:12px;fill:var(--mute);font-family:var(--f-body);font-style:italic}
+svg .muda{animation:muda 1.1s ease-out}
+svg .nova{animation:nova .6s ease-out}
+@keyframes muda{0%{stroke:var(--lar);stroke-width:5}100%{stroke:var(--noborda);stroke-width:1.4}}
+@keyframes nova{0%{opacity:0;transform:translateY(-8px)}100%{opacity:1;transform:none}}
+/* player */
+.player{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:14px;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:8px 12px}
+.player input[type=range]{flex:1 1 200px;accent-color:var(--navy);min-height:40px}
+.cont{font:14px var(--f-mono);color:var(--mute);white-space:nowrap}
+.chk{display:flex;gap:6px;align-items:center;font-size:15px}
+.chk input{width:18px;height:18px;accent-color:var(--navy)}
+.leg{display:flex;flex-wrap:wrap;gap:14px;font-size:14px;color:var(--mute);margin-top:10px;align-items:center}
+.leg span{display:inline-flex;align-items:center;gap:6px}
+.leg i{display:inline-block;width:20px;height:3px;background:var(--navyink)}
+.leg i.this{background:repeating-linear-gradient(90deg,var(--roxo) 0 5px,transparent 5px 8px)}
+.leg i.aux{background:var(--lar);height:3.5px}
+.leg i.cab{height:13px;width:15px;background:var(--cabeca);border:1px solid var(--noborda)}
+.leg i.esp{height:13px;width:15px;background:var(--no);border-left:4px solid var(--noborda)}
+.leg i.at{height:13px;width:15px;background:var(--larcl);border-left:4px solid var(--lar)}
+footer{max-width:1500px;margin:auto;padding:0 max(3vw,14px) 28px;color:var(--mute);font-size:14px}
+@media(max-width:900px){.palco{grid-template-columns:minmax(0,1fr)}#codFila{max-height:280px}}
+@media(prefers-reduced-motion:reduce){svg .muda,svg .nova{animation:none}}
+</style>
+</head>
+<body>
+<header>
+  <h1>Simulador de Fila</h1>
+  <p>Algoritmos e Estruturas de Dados · PUC Minas · o teste de mesa de um programa que usa a <code style="background:none;color:#fff">CFila&lt;int&gt;</code> do arquivo <code style="background:none;color:#fff">ClassesAED2025.cs</code> · <a href="index.html">todos os simuladores</a></p>
+</header>
+<main>
+  <div class="ops" role="group" aria-label="Ir para um comando do Main">
+    <span class="lb">Ir para:</span>
+    <div id="chips" style="display:contents"></div>
+  </div>
+  <p class="dica">À esquerda, a linha em execução no <code>Main</code> (em azul, quando está esperando um método terminar) e no método da <code>CFila</code>. À direita, a memória: as variáveis na pilha de execução e os objetos no heap. Use <kbd>←</kbd> e <kbd>→</kbd> para voltar e avançar.</p>
+
+  <div class="palco">
+    <section class="card" aria-label="Código em execução">
+      <div class="tit"><span>Program.cs · Main</span><small>programa de exemplo</small></div>
+      <div class="codigo" id="codMain"></div>
+      <div class="tit" style="border-top:1px solid var(--line)"><span>ClassesAED2025.cs · classe CFila&lt;T&gt;</span><small>trecho usado</small></div>
+      <div class="codigo" id="codFila"></div>
+    </section>
+    <section class="card" aria-label="Memória">
+      <div class="tit"><span>Memória: pilha de execução e heap</span><small id="etapaAtual"></small></div>
+      <div class="memoria"><svg id="mem" viewBox="0 0 800 336" role="img" aria-label="Estado da memória no passo atual"></svg></div>
+      <div class="nota" id="explica" aria-live="polite"><p style="margin:0"></p></div>
+      <div class="pare" id="pare" hidden>
+        <span class="titulo">Pare e pense</span>
+        <p id="pareQ" style="margin:0"></p>
+        <div><button id="pareBtn" type="button">Mostrar resposta</button></div>
+        <p class="resposta" id="pareR" hidden style="margin:0"></p>
+      </div>
+      <div class="telab"><h3>Tela (console)</h3><pre class="console" id="console"></pre></div>
+    </section>
+  </div>
+
+  <div class="player" role="group" aria-label="Controle dos passos">
+    <button id="pIni" type="button" title="Primeiro passo" aria-label="Primeiro passo">⏮</button>
+    <button id="pAnt" type="button" title="Passo anterior (←)" aria-label="Passo anterior">◀</button>
+    <button id="pPlay" type="button" class="pri" title="Executar / pausar" aria-label="Executar ou pausar" style="min-width:150px">▶ Executar</button>
+    <button id="pPro" type="button" title="Próximo passo (→)" aria-label="Próximo passo">▶|</button>
+    <button id="pFim" type="button" title="Último passo" aria-label="Último passo">⏭</button>
+    <input type="range" id="barra" min="0" value="0" aria-label="Passo da execução">
+    <span class="cont" id="contador" aria-live="polite"></span>
+    <select id="modo" aria-label="Modo de execução">
+      <option value="auto">Execução automática</option><option value="manual">Um passo por clique</option>
+    </select>
+    <select id="vel" aria-label="Velocidade">
+      <option value="3200">0,5×</option><option value="1700" selected>1×</option><option value="900">2×</option><option value="450">4×</option>
+    </select>
+    <label class="chk"><input type="checkbox" id="enderecos"> mostrar endereços</label>
+  </div>
+  <div class="leg">
+    <span><i></i>referência</span>
+    <span><i class="this"></i><code>this</code></span>
+    <span><i class="aux"></i>variável auxiliar (<code>aux</code>)</span>
+    <span><i class="cab"></i>célula cabeça (<code>Item</code> ignorado)</span>
+    <span><i class="at"></i>linha em execução</span>
+    <span><i class="esp"></i>linha do <code>Main</code> aguardando o método</span>
+  </div>
+  <p class="dica">Na execução automática, o simulador para sozinho nos quadros <b>Pare e pense</b>: responda antes de mostrar a resposta. Os endereços de memória são ilustrativos.</p>
+</main>
+<footer>Algoritmos e Estruturas de Dados · PUC Minas · Prof. Rodrigo Richard Gomes</footer>
+<script>
+(function () {
+  "use strict";
+
+  // ------------------------------------------------------------------ código exibido
+  const MAIN = {
+    1: "using AED;", 2: "", 3: "class Program", 4: "{", 5: "    static void Main()", 6: "    {",
+    7: [["        ", null], ["CFila<int> f", "decl"], [" ", null], ["=", "assign"], [" ", null], ["new CFila<int>", "new"], ["()", "ctor"], [";", null]],
+    8: "        Console.WriteLine(f.EstaVazia());",
+    9: "        f.Enfileira(2);", 10: "        f.Enfileira(7);", 11: "        f.Enfileira(19);",
+    12: "        Console.WriteLine($\"Quantidade: {f.Quantidade}\");",
+    13: "        Console.WriteLine($\"Primeiro: {f.Peek()}\");",
+    14: "        int x = f.Desenfileira();",
+    15: "        Console.WriteLine($\"Saiu: {x}\");",
+    16: "        Console.WriteLine(f.Contem(2));",
+    17: "        f.Enfileira(5);",
+    18: "        int y = f.Desenfileira();",
+    19: "        Console.WriteLine($\"Saiu: {y}\");",
+    20: "        foreach (int v in f)",
+    21: "            Console.Write(v + \" \");",
+    22: "    }", 23: "}"
+  };
+  const FILA = {
+    36: "public class CFila<T> : IEnumerable<T>", 37: "{",
+    38: "    private CCelula<T> Frente;", 39: "    private CCelula<T> Tras;", 40: "    private int Qtde = 0;", 41: "",
+    42: "    public CFila()", 43: "    {",
+    44: [["        ", null], ["Frente =", "lhs"], [" ", null], ["new CCelula<T>()", "rhs"], [";", null]],
+    45: "        Tras = Frente;", 46: "    }", 47: "",
+    48: [["    public bool EstaVazia() => ", null], ["Frente == Tras", "expr"], [";", null]], 49: "",
+    50: "    public void Enfileira(T valorItem)", 51: "    {",
+    52: [["        ", null], ["Tras.Prox =", "lhs"], [" ", null], ["new CCelula<T>(valorItem)", "rhs"], [";", null]],
+    53: "        Tras = Tras.Prox;", 54: "        Qtde++;", 55: "    }", 56: "",
+    57: "    public T Desenfileira()", 58: "    {", 59: "        if (Frente != Tras)", 60: "        {",
+    61: "            Frente = Frente.Prox;", 62: "            T item = Frente.Item;", 63: "            Qtde--;",
+    64: "            return item;", 65: "        }", 66: "        return default(T);", 67: "    }", 68: "",
+    69: [["    public T Peek() => ", null], ["Frente != Tras", "cond"], [" ? ", null], ["Frente.Prox.Item", "then"], [" : ", null], ["default(T)", "else"], [";", null]], 70: "",
+    71: "    public bool Contem(T valorItem)", 72: "    {",
+    73: [["        for (", null], ["CCelula<T> aux = Frente.Prox", "init"], ["; ", null], ["aux != null", "cond"], ["; ", null], ["aux = aux.Prox", "upd"], [")", null]],
+    74: "            if (EqualityComparer<T>.Default.Equals(aux.Item, valorItem))",
+    75: "                return true;", 76: "        return false;", 77: "    }", 78: "",
+    79: "    public int Quantidade => Qtde;", 80: "",
+    81: "    public IEnumerator<T> GetEnumerator()", 82: "    {",
+    83: [["        for (", null], ["var aux = Frente.Prox", "init"], ["; ", null], ["aux != null", "cond"], ["; ", null], ["aux = aux.Prox", "upd"], [")", null]],
+    84: "            yield return aux.Item;", 85: "    }", 86: "",
+    87: "    IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();", 88: "}"
+  };
+
+  const KW = new Set("public private class int bool void new return if else for var null default foreach in static using yield true false".split(" "));
+  const TY = new Set("CFila CCelula T IEnumerable IEnumerator EqualityComparer Console Program AED".split(" "));
+  function esc(s) { return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
+  function realce(s) {
+    let out = "";
+    const re = /(\$?"(?:[^"\\]|\\.)*")|(\/\/.*$)|([A-Za-z_]\w*)|(\d+)|(\s+)|([\s\S])/g;
+    let m;
+    while ((m = re.exec(s)) !== null) {
+      if (m[1]) out += '<span class="t-str">' + esc(m[1]) + "</span>";
+      else if (m[2]) out += '<span class="t-cm">' + esc(m[2]) + "</span>";
+      else if (m[3]) out += KW.has(m[3]) ? '<span class="t-kw">' + m[3] + "</span>" : TY.has(m[3]) ? '<span class="t-ty">' + m[3] + "</span>" : m[3];
+      else if (m[4]) out += '<span class="t-num">' + m[4] + "</span>";
+      else out += esc(m[0]);
+    }
+    return out;
+  }
+  function montaCodigo(el, linhas) {
+    let html = "";
+    for (const n of Object.keys(linhas).map(Number).sort((a, b) => a - b)) {
+      const l = linhas[n];
+      let corpo;
+      if (Array.isArray(l)) corpo = l.map(([t, p]) => p ? '<span data-p="' + p + '">' + realce(t) + "</span>" : realce(t)).join("");
+      else corpo = realce(l);
+      html += '<div class="ln" data-l="' + n + '"><span class="num">' + n + "</span><span>" + (corpo || " ") + "</span></div>";
+    }
+    el.innerHTML = html;
+  }
+  function montaSimples(el, texto) {
+    const linhas = {};
+    texto.split("\n").forEach((t, i) => { linhas[i + 1] = t; });
+    montaCodigo(el, linhas);
+    el.querySelectorAll(".num").forEach(n => { n.style.width = "2.4em"; });
+  }
+
+  // ------------------------------------------------------------------ construção do roteiro de execução
+  const OBJ = "0x41A0";
+  const END = ["0x24B8", "0x2A10", "0x2C30", "0x2E58", "0x3070", "0x3298"];
+  const S = { main: [], frame: null, obj: null, cells: [], out: "", foco: null };
+  const PASSOS = [];
+  let etapa = "";
+  let nCel = 0;
+
+  function clone(o) { return JSON.parse(JSON.stringify(o)); }
+  function passo(ml, fl, txt, q) {
+    const p = clone(S);
+    p.ml = ml; p.fl = fl; p.txt = txt; p.q = q || null; p.etapa = etapa;
+    PASSOS.push(p);
+    S.foco = null;
+  }
+  function cel(id) { return S.cells.find(c => c.id === id); }
+  function novaCel(item, cinza) { const id = "c" + nCel; S.cells.push({ id, addr: END[nCel], item, prox: null, lixo: false, cinza: !!cinza }); nCel++; return id; }
+  function mainVar(n, t, v) { S.main.push({ n, t, v }); }
+  function setMain(n, v) { S.main.find(x => x.n === n).v = v; }
+  function frame(nome, vars) { S.frame = { nome, vars }; }
+  function setFr(n, v) { const x = S.frame.vars.find(x => x.n === n); if (x) x.v = v; else S.frame.vars.push({ n, t: typeof v === "number" ? "int" : "ref", v }); }
+  function lista() { const r = []; let c = cel(S.obj.Frente).prox; while (c) { r.push(cel(c).item); c = cel(c).prox; } return r; }
+  function coleta() { const tinha = S.cells.some(c => c.lixo); S.cells = S.cells.filter(c => !c.lixo); return tinha; }
+
+  // linha 5
+  etapa = "início";
+  passo(5, null, "O programa começa no `Main`. A pilha de execução ainda não tem variáveis e o heap está vazio.");
+
+  // linha 7: new CFila<int>()
+  etapa = "new CFila";
+  mainVar("f", "ref", "?");
+  passo({ l: 7, p: "decl" }, null, "Passo 1, declaração: cria a variável local `f`, uma referência para `CFila<int>`. Ela ainda não recebeu valor (por isso o `?`): o compilador não deixa usá-la antes da atribuição.",
+    { p: "No próximo passo o `new` cria o objeto fila. Antes de o construtor executar, quanto valerão os atributos `Frente`, `Tras` e `Qtde`?",
+      r: "`Frente` e `Tras` valerão `null`, e `Qtde` valerá `0`. Atributos sempre recebem o valor padrão do tipo quando o objeto é criado; só variáveis locais, como `f`, ficam sem valor." });
+  S.obj = { Frente: null, Tras: null, Qtde: 0 };
+  passo({ l: 7, p: "new" }, null, "Passo 2, alocação: `new` reserva espaço no heap para o objeto fila, no endereço `0x41A0`. Os atributos já nascem com o valor padrão: referências valem `null` e `int` vale `0`.");
+  frame("new CFila<int>()", [{ n: "this", t: "ref", v: "OBJ" }]);
+  passo({ l: 7, p: "ctor" }, { l: 40 }, "Passo 3, construtor: antes do corpo do construtor roda o inicializador do atributo, `Qtde = 0` (ele já valia 0). `this` é a referência para o objeto que está sendo construído.");
+  const c0 = novaCel(0, true);
+  passo({ l: 7, p: "ctor" }, { l: 44, p: "rhs" }, "Primeiro o lado direito: `new CCelula<T>()` cria uma célula com o construtor sem parâmetros: `Item = default(T)`, que é 0 para `int`, e `Prox = null`. Endereço `0x24B8`.");
+  S.obj.Frente = c0;
+  passo({ l: 7, p: "ctor" }, { l: 44, p: "lhs" }, "`Frente` recebe o endereço da nova célula. A célula para onde `Frente` aponta é a célula cabeça.");
+  S.obj.Tras = c0;
+  passo({ l: 7, p: "ctor" }, { l: 45 }, "`Tras = Frente` copia o endereço: as duas referências apontam para a mesma célula. A fila está vazia.");
+  passo({ l: 7, p: "ctor" }, { l: 46 }, "Fim do construtor: o objeto está pronto para ser usado.");
+  S.frame = null; setMain("f", "OBJ");
+  passo({ l: 7, p: "assign" }, null, "Passo 4, atribuição: `f` recebe o endereço do objeto fila (`0x41A0`). Agora `f` aponta para a fila.");
+
+  // linha 8: EstaVazia
+  etapa = "EstaVazia()";
+  frame("f.EstaVazia()", [{ n: "this", t: "ref", v: "OBJ" }]);
+  passo({ l: 8 }, { l: 48 }, "Para imprimir, `Console.WriteLine` precisa do valor de `f.EstaVazia()`, então o método é chamado. `this` aponta para o mesmo objeto que `f`.",
+    { p: "`Frente` e `Tras` apontam para a mesma célula. Que valor a expressão `Frente == Tras` terá?", r: "`true`. O operador `==` compara as referências, isto é, os endereços: `0x24B8 == 0x24B8`." });
+  passo({ l: 8 }, { l: 48, p: "expr" }, "`Frente == Tras` compara endereços: `0x24B8 == 0x24B8` resulta em `true`. A fila está vazia.");
+  S.frame = null; S.out += "True\n";
+  passo({ l: 8 }, null, "O método retorna `true` e `Console.WriteLine` imprime `True`.");
+
+  // Enfileira
+  function enfileira(v, ml, comPergunta) {
+    etapa = "Enfileira(" + v + ")";
+    frame("f.Enfileira(" + v + ")", [{ n: "this", t: "ref", v: "OBJ" }, { n: "valorItem", t: "int", v }]);
+    passo({ l: ml }, { l: 50 }, "Chama `Enfileira(" + v + ")`. O parâmetro `valorItem` recebe uma cópia do valor " + v + ".");
+    const nc = novaCel(v);
+    passo({ l: ml }, { l: 52, p: "rhs" }, "Primeiro o lado direito: `new` cria uma célula com o construtor de um parâmetro: `Item = " + v + "` e `Prox = null`.");
+    cel(S.obj.Tras).prox = nc;
+    const ultimaEraCabeca = S.obj.Tras === S.obj.Frente;
+    passo({ l: ml }, { l: 52, p: "lhs" }, "Depois, `Tras.Prox` recebe o endereço da nova célula: " + (ultimaEraCabeca ? "a última célula, que é a própria cabeça, " : "a última célula ") + "engata o novo vagão.",
+      comPergunta ? { p: "Olhe o desenho. Ele já está correto? O que ainda falta fazer?", r: "Falta mover `Tras`: ele ainda aponta para a célula anterior, e não para a nova última célula. É o que a linha 53 faz. Depois, `Qtde` precisa aumentar." } : null);
+    S.obj.Tras = nc;
+    passo({ l: ml }, { l: 53 }, "`Tras = Tras.Prox`: `Tras` avança para a nova última célula. É o \"`i++`\" das estruturas encadeadas.");
+    S.obj.Qtde++;
+    passo({ l: ml }, { l: 54 }, "`Qtde` passa de " + (S.obj.Qtde - 1) + " para " + S.obj.Qtde + ". Repare que `Frente` não mudou.");
+    S.frame = null;
+    passo({ l: ml }, null, "Fim de `Enfileira`: o parâmetro `valorItem` deixa de existir. A fila agora é " + lista().join(", ") + ", em " + (S.cells.length) + " células (uma a mais, a cabeça).");
+  }
+  enfileira(2, 9, true);
+  enfileira(7, 10, false);
+  enfileira(19, 11, false);
+
+  // linha 12: Quantidade
+  etapa = "Quantidade";
+  frame("f.Quantidade (get)", [{ n: "this", t: "ref", v: "OBJ" }]);
+  passo({ l: 12 }, { l: 79 }, "`Quantidade` é uma propriedade: só devolve o valor do atributo privado `Qtde`, que é 3. Não percorre a fila: custo O(1).");
+  S.frame = null; S.out += "Quantidade: 3\n";
+  passo({ l: 12 }, null, "Imprime `Quantidade: 3`.");
+
+  // linha 13: Peek
+  etapa = "Peek()";
+  frame("f.Peek()", [{ n: "this", t: "ref", v: "OBJ" }]);
+  passo({ l: 13 }, { l: 69, p: "cond" }, "Chama `Peek()`. Primeiro a condição: `Frente != Tras`? `0x24B8 != 0x2E58`, verdadeiro: a fila tem elementos.");
+  S.foco = "c1";
+  passo({ l: 13 }, { l: 69, p: "then" }, "`Frente.Prox.Item`: de `Frente` (a cabeça) vai para `Prox` (a célula do 2) e pega o `Item`, que é 2. Nada é removido.");
+  S.frame = null; S.out += "Primeiro: 2\n";
+  passo({ l: 13 }, null, "Imprime `Primeiro: 2`. Chamar `Peek()` de novo daria o mesmo 2.");
+
+  // Desenfileira
+  function desenfileira(ml, nomeVar, comPergunta) {
+    etapa = nomeVar + " = Desenfileira()";
+    mainVar(nomeVar, "int", "?");
+    frame("f.Desenfileira()", [{ n: "this", t: "ref", v: "OBJ" }]);
+    passo({ l: ml }, { l: 57 }, "Declara a variável local `" + nomeVar + "` (ainda sem valor) e chama `f.Desenfileira()` para obter o valor dela.");
+    const antiga = S.obj.Frente;
+    passo({ l: ml }, { l: 59 }, "`Frente != Tras`? Sim: `Frente` está na cabeça e `Tras` na última célula. A fila tem elementos, então entramos no `if`.",
+      comPergunta ? { p: "Na próxima linha, qual célula vai deixar de fazer parte da estrutura: a célula do 2 ou a célula cabeça?", r: "A célula cabeça. `Frente` avança para a célula do 2, que passa a ser a nova cabeça (remoção lógica). A cabeça antiga fica sem nenhuma referência." } : null);
+    S.obj.Frente = cel(antiga).prox;
+    cel(antiga).lixo = true;
+    const valor = cel(S.obj.Frente).item;
+    passo({ l: ml }, { l: 61 }, "`Frente = Frente.Prox`: `Frente` avança para a célula do " + valor + ", que vira a nova célula cabeça (remoção lógica). A cabeça antiga ficou sem nenhuma referência: inalcançável.");
+    setFr("item", valor);
+    S.foco = S.obj.Frente;
+    passo({ l: ml }, { l: 62 }, "`T item = Frente.Item`: guarda o " + valor + " numa variável local antes de retornar.");
+    S.obj.Qtde--;
+    passo({ l: ml }, { l: 63 }, "`Qtde` passa de " + (S.obj.Qtde + 1) + " para " + S.obj.Qtde + ".");
+    passo({ l: ml }, { l: 64 }, "`return item` devolve " + valor + ".");
+    S.frame = null; setMain(nomeVar, valor);
+    passo({ l: ml }, null, "`" + nomeVar + "` recebe " + valor + ", e a variável `item` deixa de existir. O " + valor + " continua dentro da nova cabeça, mas é ignorado: a fila agora é " + lista().join(", ") + ".");
+    return valor;
+  }
+  desenfileira(14, "x", true);
+
+  // linha 15
+  etapa = "Saiu: x";
+  coleta(); S.out += "Saiu: 2\n";
+  passo({ l: 15 }, null, "Imprime `Saiu: 2`. Suponha que, enquanto isso, o coletor de lixo passou e liberou a antiga cabeça, que ninguém referenciava.");
+
+  // linha 16: Contem(2)
+  etapa = "Contem(2)";
+  frame("f.Contem(2)", [{ n: "this", t: "ref", v: "OBJ" }, { n: "valorItem", t: "int", v: 2 }]);
+  passo({ l: 16 }, { l: 71 }, "Chama `Contem(2)`: `valorItem` recebe 2.",
+    { p: "O 2 ainda está na memória, dentro da célula cabeça. `Contem(2)` vai retornar `true` ou `false`?", r: "`false`. O laço começa em `Frente.Prox`, a primeira célula depois da cabeça; o `Item` da cabeça nunca é examinado. Acompanhe nos próximos passos." });
+  const ordem = []; { let c = cel(S.obj.Frente).prox; while (c) { ordem.push(c); c = cel(c).prox; } }
+  setFr("aux", ordem[0]);
+  passo({ l: 16 }, { l: 73, p: "init" }, "Inicialização do `for`, executada uma única vez: `aux` começa em `Frente.Prox`, pulando a célula cabeça.");
+  for (let k = 0; k < ordem.length; k++) {
+    const it = cel(ordem[k]).item;
+    passo({ l: 16 }, { l: 73, p: "cond" }, "Condição: `aux != null`? Verdadeiro, `aux` aponta para a célula do " + it + ".");
+    S.foco = ordem[k];
+    passo({ l: 16 }, { l: 74 }, "Compara o `Item` apontado por `aux` com `valorItem`: " + it + " é igual a 2? Falso.");
+    setFr("aux", cel(ordem[k]).prox);
+    passo({ l: 16 }, { l: 73, p: "upd" }, "Atualização: `aux = aux.Prox`. " + (cel(ordem[k]).prox ? "`aux` avança para a próxima célula." : "O `Prox` da última célula é `null`, então agora `aux` vale `null`."));
+  }
+  passo({ l: 16 }, { l: 73, p: "cond" }, "Condição: `aux != null`? Falso. O laço termina.");
+  passo({ l: 16 }, { l: 76 }, "Percorreu a fila inteira sem encontrar o 2: retorna `false`. Custo O(n).");
+  S.frame = null; S.out += "False\n";
+  passo({ l: 16 }, null, "Imprime `False`.");
+
+  // linha 17: Enfileira(5)
+  enfileira(5, 17, false);
+
+  // linha 18: y = Desenfileira()
+  desenfileira(18, "y", false);
+
+  // linha 19
+  etapa = "Saiu: y";
+  coleta(); S.out += "Saiu: 7\n";
+  passo({ l: 19 }, null, "Imprime `Saiu: 7`. Suponha que o coletor de lixo também já liberou a célula do 2, a cabeça anterior.");
+
+  // linhas 20-21: foreach
+  etapa = "foreach";
+  frame("f.GetEnumerator()", [{ n: "this", t: "ref", v: "OBJ" }]);
+  passo({ l: 20 }, { l: 81 }, "O `foreach` pede à fila um iterador, chamando `GetEnumerator()`.",
+    { p: "Quais números o `foreach` vai imprimir?", r: "`19 5`. A célula do 7 é agora a cabeça, e `GetEnumerator` começa em `Frente.Prox`." });
+  const ordem2 = []; { let c = cel(S.obj.Frente).prox; while (c) { ordem2.push(c); c = cel(c).prox; } }
+  setFr("aux", ordem2[0]);
+  passo({ l: 20 }, { l: 83, p: "init" }, "Inicialização: `aux` começa em `Frente.Prox`, pulando a cabeça (que guarda o 7, ignorado).");
+  ordem2.forEach((id, k) => {
+    const it = cel(id).item;
+    if (k > 0) {
+      S.main = S.main.filter(m => m.n !== "v"); S.frame.nome = "f.GetEnumerator()";
+      setFr("aux", id);
+      passo({ l: 20 }, { l: 83, p: "upd" }, "O `foreach` pede o próximo elemento. O iterador continua de onde parou: `aux = aux.Prox`.");
+    }
+    passo({ l: 20 }, { l: 83, p: "cond" }, "Condição: `aux != null`? Verdadeiro.");
+    S.foco = id;
+    passo({ l: 20 }, { l: 84 }, "`yield return aux.Item` entrega " + it + " ao `foreach` e pausa o laço nesta linha.");
+    S.frame.nome = "f.GetEnumerator() · pausado";
+    S.main = S.main.filter(m => m.n !== "v"); mainVar("v", "int", it);
+    S.out += it + " ";
+    passo({ l: 21 }, null, "A variável `v` recebe " + it + " e o corpo do `foreach` imprime `" + it + " `.");
+  });
+  S.main = S.main.filter(m => m.n !== "v"); S.frame.nome = "f.GetEnumerator()";
+  setFr("aux", null);
+  passo({ l: 20 }, { l: 83, p: "upd" }, "O `foreach` pede o próximo: `aux = aux.Prox` vale `null`, pois a célula do 5 é a última.");
+  passo({ l: 20 }, { l: 83, p: "cond" }, "Condição: `aux != null`? Falso. O laço termina e o iterador avisa que não há mais elementos.");
+  S.frame = null;
+  etapa = "fim";
+  passo(22, null, "Fim do `Main`. A fila tem 2 elementos (19 e 5) em 3 células: a cabeça (com o 7, ignorado), a do 19 e a do 5.",
+    { p: "Se o programa continuasse com `int z = f.Desenfileira();`, que valor `z` receberia e qual célula viraria a cabeça?", r: "`z` receberia 19, e a célula do 19 viraria a nova cabeça. A célula do 7 ficaria inalcançável." });
+
+
+  // ------------------------------------------------------------------ desenho da memória
+  const NS = "http://www.w3.org/2000/svg";
+  const svg = document.getElementById("mem");
+  let mostrarEnd = false;
+
+  function chaves(p) {
+    const m = {};
+    if (!p) return m;
+    p.main.forEach(v => { m["m." + v.n] = String(v.v); });
+    if (p.frame) { m["fr"] = p.frame.nome; p.frame.vars.forEach(v => { m["f." + v.n] = String(v.v); }); }
+    if (p.obj) { m["o"] = 1; m["o.F"] = String(p.obj.Frente); m["o.T"] = String(p.obj.Tras); m["o.Q"] = String(p.obj.Qtde); }
+    p.cells.forEach(c => { m["c." + c.id] = 1; m["c." + c.id + ".i"] = String(c.item); m["c." + c.id + ".p"] = String(c.prox); m["c." + c.id + ".l"] = String(c.lixo); });
+    return m;
+  }
+
+  function desenha(i) {
+    const p = PASSOS[i], ant = i > 0 ? PASSOS[i - 1] : null;
+    const ka = chaves(ant), kp = chaves(p);
+    const mudou = k => ant !== null && ka[k] !== kp[k];
+    const novo = k => ant !== null && !(k in ka) && (k in kp);
+    const g = [];
+    const pos = {};
+    const endDe = v => v === "OBJ" ? OBJ : (p.cells.find(c => c.id === v) || {}).addr;
+
+    g.push('<defs>' +
+      '<marker id="mR" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="ponto"/></marker>' +
+      '<marker id="mB" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="ponto this"/></marker>' +
+      '<marker id="mA" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="ponto aux"/></marker>' +
+      '</defs>');
+    g.push('<text class="rot" x="10" y="16">Pilha de execução</text>');
+    g.push('<text class="rot" x="250" y="16">Heap (objetos)</text>');
+    g.push('<line x1="228" y1="6" x2="228" y2="330" stroke="var(--line)" stroke-width="1"/>');
+
+    // valor de uma variável ou atributo
+    function caixa(x, y, w, v, t, chave, classeSeta) {
+      const cls = "caixa" + (mudou(chave) ? " muda" : "");
+      g.push('<rect class="' + cls + '" x="' + x + '" y="' + y + '" width="' + w + '" height="24" rx="3"/>');
+      const cx = x + w / 2, cy = y + 12;
+      if (t === "int") {
+        g.push('<text class="vtxt' + (v === "?" ? " fraco" : "") + '" x="' + cx + '" y="' + cy + '">' + v + "</text>");
+        return null;
+      }
+      if (v === "?" || v === null) {
+        g.push('<text class="vtxt fraco" x="' + cx + '" y="' + cy + '">' + (v === null ? "null" : "?") + "</text>");
+        return null;
+      }
+      const ox = x + w - 10;
+      if (mostrarEnd) g.push('<text class="addr" x="' + (x + 6) + '" y="' + (cy + 4) + '">' + endDe(v) + "</text>");
+      g.push('<circle class="ponto ' + (classeSeta || "") + '" cx="' + (mostrarEnd ? ox : cx) + '" cy="' + cy + '" r="3.5"/>');
+      return { x: mostrarEnd ? ox : cx, y: cy, alvo: v };
+    }
+
+    // quadro do Main
+    let y = 26;
+    const linhasMain = Math.max(p.main.length, 1);
+    const hMain = 24 + linhasMain * 32 + 6;
+    g.push('<rect class="quadro" x="8" y="' + y + '" width="212" height="' + hMain + '" rx="6"/>');
+    g.push('<text class="quadro-titulo" x="18" y="' + (y + 16) + '">Main()</text>');
+    if (p.main.length === 0) g.push('<text class="vazio" x="18" y="' + (y + 40) + '">sem variáveis</text>');
+    const origens = [];
+    p.main.forEach((v, k) => {
+      const ry = y + 26 + k * 32;
+      g.push('<text class="nome" x="22" y="' + (ry + 17) + '">' + v.n + "</text>");
+      const o = caixa(112, ry, 96, v.v, v.t, "m." + v.n, "");
+      if (o) origens.push(Object.assign(o, { tipo: "main" }));
+    });
+    y += hMain + 12;
+
+    // quadro do método da CFila
+    if (p.frame) {
+      const h = 24 + p.frame.vars.length * 32 + 6;
+      g.push('<rect class="quadro' + (novo("fr") || mudou("fr") ? " nova" : "") + '" x="8" y="' + y + '" width="212" height="' + h + '" rx="6"/>');
+      g.push('<text class="quadro-titulo" x="18" y="' + (y + 16) + '">' + esc(p.frame.nome) + "</text>");
+      p.frame.vars.forEach((v, k) => {
+        const ry = y + 26 + k * 32;
+        g.push('<text class="nome" x="22" y="' + (ry + 17) + '">' + v.n + "</text>");
+        const cls = v.n === "this" ? "this" : v.n === "aux" ? "aux" : "";
+        const o = caixa(112, ry, 96, v.v, v.t, "f." + v.n, cls);
+        if (o) origens.push(Object.assign(o, { tipo: cls || "main" }));
+      });
+    }
+
+    // objeto fila
+    const OX = 250, OY = 40, OW = 196;
+    if (p.obj) {
+      g.push('<text class="addr" x="' + OX + '" y="' + (OY - 6) + '">CFila&lt;int&gt;  ' + OBJ + "</text>");
+      g.push('<rect class="obj' + (novo("o") ? " nova" : "") + '" x="' + OX + '" y="' + OY + '" width="' + OW + '" height="108" rx="6"/>');
+      const campos = [["Frente", p.obj.Frente, "ref", "o.F"], ["Tras", p.obj.Tras, "ref", "o.T"], ["Qtde", p.obj.Qtde, "int", "o.Q"]];
+      campos.forEach(([n, v, t, k], j) => {
+        const ry = OY + 10 + j * 32;
+        g.push('<text class="nome" x="' + (OX + 12) + '" y="' + (ry + 17) + '">' + n + "</text>");
+        const o = caixa(OX + 90, ry, 96, v, t, k, "");
+        if (o) pos[n] = o;
+      });
+    } else {
+      g.push('<text class="vazio" x="250" y="44">nenhum objeto</text>');
+    }
+
+    // células
+    const CY = 232, CX0 = 260, PASSO_X = 124, IW = 50, PW = 36;
+    p.cells.forEach((c, k) => {
+      const x = CX0 + k * PASSO_X;
+      pos[c.id] = { x, y: CY };
+    });
+    p.cells.forEach(c => {
+      const { x } = pos[c.id];
+      const cabeca = p.obj && p.obj.Frente === c.id;
+      const grupo = [];
+      grupo.push('<text class="addr halo" x="' + (x + 2) + '" y="' + (CY + 50) + '">' + c.addr + "</text>");
+      grupo.push('<rect class="cel-item' + (cabeca ? " cabeca" : "") + (mudou("c." + c.id + ".i") ? " muda" : "") + '" x="' + x + '" y="' + CY + '" width="' + IW + '" height="34"/>');
+      grupo.push('<rect class="cel-prox' + (mudou("c." + c.id + ".p") ? " muda" : "") + '" x="' + (x + IW) + '" y="' + CY + '" width="' + PW + '" height="34"/>');
+      grupo.push('<text class="vtxt' + (cabeca || c.lixo ? " fraco" : "") + '" x="' + (x + IW / 2) + '" y="' + (CY + 17) + '">' + c.item + "</text>");
+      const px = x + IW + PW / 2, py = CY + 17;
+      if (c.prox === null) {
+        grupo.push('<circle class="ponto" cx="' + px + '" cy="' + py + '" r="3.5"/>');
+        grupo.push('<path class="terra" d="M' + px + "," + py + " V" + (py + 26) + " M" + (px - 9) + "," + (py + 26) + " H" + (px + 9) + " M" + (px - 5.5) + "," + (py + 30) + " H" + (px + 5.5) + " M" + (px - 2) + "," + (py + 34) + " H" + (px + 2) + '"/>');
+      } else if (pos[c.prox]) {
+        const t = pos[c.prox];
+        grupo.push('<circle class="ponto" cx="' + px + '" cy="' + py + '" r="3.5"/>');
+        grupo.push('<path class="seta" marker-end="url(#mR)" d="M' + px + "," + py + " H" + (t.x - 2) + '"/>');
+      }
+      if (cabeca) grupo.push('<text class="tag cab halo" x="' + (x + 43) + '" y="' + (CY + 68) + '">célula cabeça</text>');
+      if (c.lixo) grupo.push('<text class="tag lix halo" x="' + (x + 43) + '" y="' + (CY + 68) + '">inalcançável</text>');
+      if (p.foco === c.id) grupo.push('<rect class="foco" x="' + (x - 3) + '" y="' + (CY - 3) + '" width="' + (IW + 6) + '" height="40" rx="6"/>');
+      g.push('<g class="' + (c.lixo ? "lixo " : "") + (novo("c." + c.id) ? "nova" : "") + '">' + grupo.join("") + "</g>");
+    });
+
+    // setas Frente e Tras
+    function setaCampo(o, deslocX) {
+      const t = pos[o.alvo]; if (!t) return;
+      const tx = t.x + deslocX, ty = CY - 2;
+      g.push('<path class="seta" marker-end="url(#mR)" d="M' + o.x + "," + o.y + " C" + (o.x + 70) + "," + o.y + " " + tx + "," + (ty - 70) + " " + tx + "," + ty + '"/>');
+    }
+    if (pos.Frente) setaCampo(pos.Frente, 16);
+    if (pos.Tras) setaCampo(pos.Tras, 70);
+
+    // setas das variáveis da pilha
+    origens.forEach(o => {
+      if (o.alvo === "OBJ") {
+        const ty = o.tipo === "this" ? OY + 90 : OY + 20;
+        g.push('<path class="seta ' + (o.tipo === "this" ? "this" : "") + '" marker-end="url(#' + (o.tipo === "this" ? "mB" : "mR") + ')" d="M' + o.x + "," + o.y + " C" + (o.x + 34) + "," + o.y + " " + (OX - 30) + "," + ty + " " + (OX - 2) + "," + ty + '"/>');
+      } else if (pos[o.alvo]) {
+        const t = pos[o.alvo];
+        const tx = t.x + IW / 2, ty = CY + 36;
+        g.push('<path class="seta aux" marker-end="url(#mA)" d="M' + o.x + "," + o.y + " C" + (o.x + 60) + "," + (o.y + 10) + " " + tx + "," + (ty + 50) + " " + tx + "," + ty + '"/>');
+      }
+    });
+
+    svg.innerHTML = g.join("");
+  }
+
+
+  // ------------------------------------------------------------------ painéis de código, texto e console
+  const codMain = document.getElementById("codMain");
+  const codFila = document.getElementById("codFila");
+  montaCodigo(codMain, MAIN);
+  montaCodigo(codFila, FILA);
+
+  function marca(el, alvo, classe) {
+    el.querySelectorAll(".ln").forEach(l => l.classList.remove("atual", "atual-parcial", "espera"));
+    el.querySelectorAll(".parte-on").forEach(s => s.classList.remove("parte-on"));
+    if (!alvo) return null;
+    const a = typeof alvo === "number" ? { l: alvo } : alvo;
+    const ln = el.querySelector('.ln[data-l="' + a.l + '"]');
+    if (!ln) return null;
+    if (classe === "espera") ln.classList.add("espera");
+    else if (a.p) { ln.classList.add("atual-parcial"); const sp = ln.querySelector('[data-p="' + a.p + '"]'); if (sp) sp.classList.add("parte-on"); }
+    else ln.classList.add("atual");
+    return ln;
+  }
+  function rolaDentro(caixa, ln) {
+    if (!ln) return;
+    const topo = ln.offsetTop - caixa.offsetTop;
+    if (topo < caixa.scrollTop + 20 || topo > caixa.scrollTop + caixa.clientHeight - 40)
+      caixa.scrollTo({ top: Math.max(0, topo - caixa.clientHeight / 2), behavior: "smooth" });
+  }
+  function fmt(t) { return esc(t).replace(/`([^`]+)`/g, "<code>$1</code>"); }
+
+  const $ = id => document.getElementById(id);
+  const explica = document.querySelector("#explica p");
+  const consoleEl = $("console");
+  const pare = $("pare"), pareQ = $("pareQ"), pareR = $("pareR"), pareBtn = $("pareBtn");
+  const contador = $("contador"), barra = $("barra"), chipsEl = $("chips");
+  barra.max = PASSOS.length - 1;
+
+  // chips: um por comando do Main
+  const etapas = [];
+  PASSOS.forEach((p, i) => { if (!etapas.length || etapas[etapas.length - 1].nome !== p.etapa) etapas.push({ nome: p.etapa, i }); });
+  chipsEl.innerHTML = etapas.map((e, k) => '<button type="button" class="chip" data-k="' + k + '">' + esc(e.nome) + "</button>").join("");
+  chipsEl.addEventListener("click", ev => { const b = ev.target.closest(".chip"); if (b) { para(); vai(etapas[+b.dataset.k].i); } });
+
+  let atual = 0, timer = null;
+  const manual = () => $("modo").value === "manual";
+  function rotulo() {
+    $("pPlay").textContent = manual() ? "▶ Executar passo" : timer ? "⏸ Pausar" : "▶ Executar";
+    $("pPlay").disabled = manual() && atual >= PASSOS.length - 1;
+    $("vel").disabled = manual();
+  }
+  function vai(i) {
+    atual = Math.max(0, Math.min(PASSOS.length - 1, i));
+    const p = PASSOS[atual];
+    desenha(atual);
+    marca(codMain, p.ml, p.fl ? "espera" : "atual");
+    const lf = marca(codFila, p.fl, "atual");
+    rolaDentro(codFila, lf);
+    explica.innerHTML = fmt(p.txt);
+    consoleEl.innerHTML = esc(p.out) + '<span class="cursor"></span>';
+    if (p.q) { pare.hidden = false; pareQ.innerHTML = fmt(p.q.p); pareR.innerHTML = fmt(p.q.r); pareR.hidden = true; pareBtn.hidden = false; }
+    else pare.hidden = true;
+    contador.textContent = (atual + 1) + "/" + PASSOS.length;
+    barra.value = atual;
+    $("pIni").disabled = $("pAnt").disabled = atual === 0;
+    $("pPro").disabled = $("pFim").disabled = atual === PASSOS.length - 1;
+    let ek = 0; etapas.forEach((e, k) => { if (e.i <= atual) ek = k; });
+    chipsEl.querySelectorAll(".chip").forEach((c, k) => c.classList.toggle("on", k === ek));
+    $("etapaAtual").textContent = etapas[ek].nome;
+    rotulo();
+  }
+  function para() { if (timer) { clearInterval(timer); timer = null; } rotulo(); }
+  function toca() {
+    if (atual >= PASSOS.length - 1) vai(0);
+    timer = setInterval(() => {
+      if (atual >= PASSOS.length - 1) { para(); return; }
+      vai(atual + 1);
+      if (PASSOS[atual].q) para();   // para nos quadros "Pare e pense"
+    }, +$("vel").value);
+    rotulo();
+  }
+  $("pIni").addEventListener("click", () => { para(); vai(0); });
+  $("pAnt").addEventListener("click", () => { para(); vai(atual - 1); });
+  $("pPro").addEventListener("click", () => { para(); vai(atual + 1); });
+  $("pFim").addEventListener("click", () => { para(); vai(PASSOS.length - 1); });
+  $("pPlay").addEventListener("click", () => { if (manual()) vai(atual + 1); else timer ? para() : toca(); });
+  $("modo").addEventListener("change", () => { para(); try { localStorage.setItem("filaModo", $("modo").value); } catch (e) { } });
+  try { const mm = localStorage.getItem("filaModo"); if (mm === "manual" || mm === "auto") $("modo").value = mm; } catch (e) { }
+  $("vel").addEventListener("change", () => { if (timer) { para(); toca(); } });
+  barra.addEventListener("input", () => { para(); vai(+barra.value); });
+  pareBtn.addEventListener("click", () => { pareR.hidden = false; pareBtn.hidden = true; });
+  $("enderecos").addEventListener("change", e => { mostrarEnd = e.target.checked; desenha(atual); });
+  document.addEventListener("keydown", e => {
+    const tag = (e.target.tagName || "").toLowerCase();
+    if (tag === "input" || tag === "select") return;
+    if (e.key === "ArrowRight") { para(); vai(atual + 1); e.preventDefault(); }
+    else if (e.key === "ArrowLeft") { para(); vai(atual - 1); e.preventDefault(); }
+  });
+
+  vai(0);
+})();
+
+</script>
+</body>
+</html>
